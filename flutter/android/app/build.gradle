@@ -97,11 +97,16 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "com.carriez.flutter_hbb"
+        // Distinct from upstream's com.carriez.flutter_hbb so this build installs
+        // alongside a stock RustDesk rather than replacing it. Only the
+        // applicationId moves -- the Kotlin package (and so every JNI class path
+        // the Rust side looks up) stays com.carriez.flutter_hbb.
+        applicationId "com.carriez.flutter_hbb.bg"
         minSdkVersion 22
         targetSdkVersion 33
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        versionNameSuffix "-bg"
     }
 
     signingConfigs {
