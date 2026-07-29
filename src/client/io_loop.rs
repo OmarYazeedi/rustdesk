@@ -236,6 +236,7 @@ impl<T: InvokeUiSession> Remote<T> {
 
                 let _keep_it = client::hc_connection(feedback, rendezvous_server, token).await;
                 let mut last_recv_time = Instant::now();
+                let mut last_timer_tick = Instant::now();
 
                 loop {
                     tokio::select! {
@@ -281,7 +282,20 @@ impl<T: InvokeUiSession> Remote<T> {
                             self.handle_local_clipboard_msg(&mut peer, _msg).await;
                         }
                         _ = self.timer.tick() => {
-                            if last_recv_time.elapsed() >= SEC30 {
+                            // The whole process can be stopped out from under us -- Android
+                            // freezes cached apps, desktops suspend. Monotonic time keeps
+                            // running throughout, so on the first tick after thawing
+                            // `last_recv_time` looks stale even when the socket is still
+                            // healthy, and we would kill a live session. Detect it by the
+                            // timer overshooting its own period and give the connection a
+                            // full window to prove itself instead. A genuinely dead peer
+                            // still surfaces immediately via `peer.next()`.
+                            let overshoot = last_timer_tick.elapsed();
+                            last_timer_tick = Instant::now();
+                            if overshoot >= SEC30 * 2 {
+                                log::info!("Process stalled for {overshoot:?}, deferring timeout");
+                                last_recv_time = Instant::now();
+                            } else if last_recv_time.elapsed() >= SEC30 {
                                 self.handler.msgbox("error", "Connection Error", "Timeout", "");
                                 break;
                             }

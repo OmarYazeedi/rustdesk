@@ -106,6 +106,14 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           .showLoading(translate('Connecting...'), onCancel: closeConnection);
     });
     WakelockManager.enable(_uniqueKey);
+    // A backgrounded app with no foreground component drops into the cached
+    // bucket, where Android's freezer SIGSTOPs every thread in the process --
+    // the Rust runtime driving this connection included. That is what kills the
+    // session on an app switch, a quick reply in another app, or an incoming
+    // call. Hold a foreground service for as long as this page is alive.
+    if (isAndroid) {
+      gFFI.invokeMethod(AndroidChannel.kStartSessionKeepAlive);
+    }
     _physicalFocusNode.requestFocus();
     gFFI.inputModel.listenToMouse(true);
     gFFI.qualityMonitorModel.checkShowQualityMonitor(sessionId);
@@ -151,6 +159,12 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     // "Connecting...". Dispatching it here makes teardown happen synchronously on
     // pop; the `sessionClose` in `gFFI.close()` becomes a no-op once removed.
     unawaited(bind.sessionClose(sessionId: sessionId));
+    // Released here for the same reason: everything below can be suspended if the
+    // app is backgrounded mid-dispose, and a stranded foreground service would
+    // leave its notification up for the rest of the process's life.
+    if (isAndroid) {
+      gFFI.invokeMethod(AndroidChannel.kStopSessionKeepAlive);
+    }
     // https://github.com/flutter/flutter/issues/64935
     super.dispose();
     gFFI.dialogManager.hideMobileActionsOverlay(store: false);
