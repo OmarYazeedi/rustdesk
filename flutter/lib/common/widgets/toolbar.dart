@@ -1204,6 +1204,37 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
         child: Text(translate('Relative mouse mode'))));
   }
 
+  // Tablet mode. Opts a touchscreen desktop into the touch affordances the mobile
+  // clients have. Off by default and inert until switched on, so it's harmless to
+  // expose on a desktop with no touchscreen.
+  if (isDesktop && isDefaultConn && !isWeb) {
+    v.add(TToggleMenu(
+        value: ffiModel.tabletMode,
+        onChanged: (value) {
+          if (value == null || value == ffiModel.tabletMode) return;
+          ffiModel.toggleTabletMode();
+        },
+        child: Text(translate('Tablet mode'))));
+  }
+
+  // Touch vs mouse mode, the switch mobile puts in its GestureHelp sheet. Only
+  // meaningful once tablet mode is on -- with it off, desktop pins touch mode.
+  if (isDesktop &&
+      isDefaultConn &&
+      !isWeb &&
+      ffiModel.tabletMode &&
+      !ffiModel.viewOnly) {
+    v.add(TToggleMenu(
+        value: !ffiModel.touchMode,
+        onChanged: (value) {
+          if (value == null) return;
+          ffiModel.toggleTouchMode();
+          bind.mainSetLocalOption(
+              key: kOptionTouchMode, value: ffiModel.touchMode ? 'Y' : 'N');
+        },
+        child: Text(translate('Mouse mode'))));
+  }
+
   // reverse mouse wheel
   if (ffiModel.keyboard) {
     var optionValue =

@@ -143,6 +143,12 @@ const String kOptionDisableClipboard = "disable_clipboard";
 const String kOptionLockAfterSessionEnd = "lock_after_session_end";
 const String kOptionPrivacyMode = "privacy_mode";
 const String kOptionTouchMode = "touch-mode";
+// Desktop-only. Opts a touchscreen desktop (a Surface or similar 2-in-1) into the
+// touch affordances the mobile clients have: a switchable touch/mouse mode, pinch
+// zoom of the local canvas, and chrome that a finger can actually reach. Off by
+// default -- a desktop with a touchscreen but a mouse in use should keep behaving
+// exactly as it does today.
+const String kOptionTabletMode = "tablet-mode";
 const String kOptionI444 = "i444";
 const String kOptionSwapLeftRightMouse = "swap-left-right-mouse";
 const String kOptionCodecPreference = "codec-preference";

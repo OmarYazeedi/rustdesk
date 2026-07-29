@@ -958,13 +958,24 @@ class _RemotePageState extends State<RemotePage>
     ];
 
     if (!_ffi.canvasModel.cursorEmbedded) {
-      paints
-          .add(Obx(() => _showRemoteCursor.isFalse || _remoteCursorMoved.isFalse
+      paints.add(Obx(() {
+        // Tablet mouse mode drives a virtual cursor with the finger, so it has to
+        // be drawn whether or not the *remote* cursor has moved -- otherwise
+        // there's nothing on screen to aim with.
+        final isTabletMouseMode =
+            _ffi.ffiModel.tabletMode && !_ffi.ffiModel.touchMode;
+        if (isTabletMouseMode) {
+          return _ffi.inputModel.relativeMouseMode.value
               ? Offstage()
-              : CursorPaint(
-                  id: widget.id,
-                  zoomCursor: _zoomCursor,
-                )));
+              : CursorPaint(id: widget.id, zoomCursor: _zoomCursor);
+        }
+        return _showRemoteCursor.isFalse || _remoteCursorMoved.isFalse
+            ? Offstage()
+            : CursorPaint(
+                id: widget.id,
+                zoomCursor: _zoomCursor,
+              );
+      }));
     }
     paints.add(
       Positioned(
@@ -1126,7 +1137,13 @@ class _ImagePaintState extends State<ImagePaint> {
               onHover: (evt) {},
               child: child);
         });
-    if (c.imageOverflow.isTrue && c.scrollStyle != ScrollStyle.scrollauto) {
+    // Tablet mode pans and zooms the canvas with fingers, so it paints at the
+    // canvas offset directly. The scrollbar path can't express that -- and its
+    // bars are mouse-sized furniture on a screen with no mouse.
+    final freePanZoom = widget.ffi.ffiModel.tabletMode;
+    if (!freePanZoom &&
+        c.imageOverflow.isTrue &&
+        c.scrollStyle != ScrollStyle.scrollauto) {
       final paintWidth = c.getDisplayWidth() * s;
       final paintHeight = c.getDisplayHeight() * s;
       final paintSize = Size(paintWidth, paintHeight);

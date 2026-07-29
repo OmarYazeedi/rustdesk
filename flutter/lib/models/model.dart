@@ -122,6 +122,10 @@ class FfiModel with ChangeNotifier {
   bool? _secure;
   bool? _direct;
   bool _touchMode = false;
+  // Rx, not a plain bool: the desktop chrome, the canvas paint path and the
+  // cursor overlay all branch on it from inside `Obx`, and a ChangeNotifier
+  // field would leave those stale.
+  final RxBool tabletModeRx = false.obs;
   late VirtualMouseMode virtualMouseMode;
   Timer? _timer;
   Timer? _restartReconnectDelayTimer;
@@ -162,6 +166,11 @@ class FfiModel with ChangeNotifier {
   bool get inputBlocked => _inputBlocked;
 
   bool get touchMode => _touchMode;
+
+  // Desktop only. Once on, `touchMode` starts meaning something on desktop, where
+  // `handleTouch` had previously pinned it true and unreachable. See
+  // `_RawTouchGestureDetectorRegionState.handleTouch` in remote_input.dart.
+  bool get tabletMode => (isDesktop || isWebDesktop) && tabletModeRx.value;
 
   bool get isPeerAndroid => _pi.platform == kPeerPlatformAndroid;
   bool get isPeerMobile => isPeerAndroid;
@@ -217,6 +226,18 @@ class FfiModel with ChangeNotifier {
       _touchMode = !_touchMode;
       notifyListeners();
     }
+  }
+
+  toggleTabletMode() {
+    tabletModeRx.value = !tabletModeRx.value;
+    bind.mainSetLocalOption(
+        key: kOptionTabletMode, value: tabletModeRx.value ? 'Y' : 'N');
+    // The canvas free-pans and pinch-zooms only in tablet mode, so leaving it
+    // has to put the canvas back under the view style's control.
+    if (!tabletModeRx.value) {
+      parent.target?.canvasModel.reset();
+    }
+    notifyListeners();
   }
 
   updatePermission(Map<String, dynamic> evt, String id) {
@@ -1377,6 +1398,10 @@ class FfiModel with ChangeNotifier {
     }
 
     final connType = parent.target?.connType;
+    if (isDesktop || isWebDesktop) {
+      tabletModeRx.value =
+          bind.mainGetLocalOption(key: kOptionTabletMode) == 'Y';
+    }
     if (isPeerAndroid) {
       _touchMode = true;
     } else {
@@ -1392,10 +1417,13 @@ class FfiModel with ChangeNotifier {
       } else {
         final optSession = await bind.sessionGetOption(
             sessionId: sessionId, arg: kOptionTouchMode);
-        _touchMode = optSession != '';
+        // Desktop ignored `touchMode` until tablet mode existed, and behaved as
+        // though it were on. Default it on so switching tablet mode on doesn't
+        // silently change how touch behaves -- mouse mode stays an opt-in.
+        _touchMode = optSession != '' || tabletMode;
       }
     }
-    if (isMobile) {
+    if (isMobile || tabletMode) {
       virtualMouseMode.loadOptions();
     }
     if (connType == ConnType.fileTransfer) {
@@ -1983,21 +2011,39 @@ class ImageModel with ChangeNotifier {
     if (image != null) notifyListeners();
   }
 
-  // mobile only
+  // The source size the canvas scale limits are measured against. Prefer the
+  // decoded image, but the desktop texture render path never populates `_image`,
+  // so fall back to the display rect -- which is set either way. Without the
+  // fallback, pinch zoom in desktop tablet mode would clamp against nothing.
+  Size? get _scaleSourceSize {
+    if (_image != null) {
+      return Size(_image!.width.toDouble(), _image!.height.toDouble());
+    }
+    final canvas = parent.target?.canvasModel;
+    if (canvas == null) return null;
+    final w = canvas.getDisplayWidth().toDouble();
+    final h = canvas.getDisplayHeight().toDouble();
+    if (w <= 0 || h <= 0) return null;
+    return Size(w, h);
+  }
+
+  // Mobile, and desktop in tablet mode.
   double get maxScale {
-    if (_image == null) return 1.5;
+    final source = _scaleSourceSize;
+    if (source == null) return 1.5;
     final size = parent.target!.canvasModel.getSize();
-    final xscale = size.width / _image!.width;
-    final yscale = size.height / _image!.height;
+    final xscale = size.width / source.width;
+    final yscale = size.height / source.height;
     return max(1.5, max(xscale, yscale));
   }
 
-  // mobile only
+  // Mobile, and desktop in tablet mode.
   double get minScale {
-    if (_image == null) return 1.5;
+    final source = _scaleSourceSize;
+    if (source == null) return 1.5;
     final size = parent.target!.canvasModel.getSize();
-    final xscale = size.width / _image!.width;
-    final yscale = size.height / _image!.height;
+    final xscale = size.width / source.width;
+    final yscale = size.height / source.height;
     return min(xscale, yscale) / 1.5;
   }
 
@@ -2207,6 +2253,10 @@ class CanvasModel with ChangeNotifier {
   // image scale
   double _scale = 1.0;
   double _devicePixelRatio = 1.0;
+  // Set once the user has pinched or panned the canvas in desktop tablet mode.
+  // From then on the canvas offset and scale are the user's, not the view
+  // style's -- see the guard in `updateViewStyle`.
+  bool _tabletCanvasChanged = false;
   Size _size = Size.zero;
   // the tabbar over the image
   // double tabBarHeight = 0.0;
@@ -2366,6 +2416,16 @@ class CanvasModel with ChangeNotifier {
       _resetScroll();
     }
     _lastViewStyle = viewStyle;
+    // In tablet mode the user's pinch owns the scale. `updateViewStyle` runs on
+    // every resize, rotation and display change, and recomputing `_scale` from
+    // the view style here would silently throw that zoom away.
+    if (_tabletCanvasChanged) {
+      if (notify) {
+        notifyListeners();
+      }
+      tryUpdateScrollStyle(Duration.zero, style);
+      return;
+    }
     _scale = viewStyle.scale;
 
     // Apply custom scale percent when in Custom mode
@@ -2657,10 +2717,14 @@ class CanvasModel with ChangeNotifier {
     notifyListeners();
   }
 
+  bool get _isTabletCanvas => parent.target?.ffiModel.tabletMode ?? false;
+
   panX(double dx) {
     _x += dx;
     if (isMobile) {
       isMobileCanvasChanged = true;
+    } else if (_isTabletCanvas) {
+      _tabletCanvasChanged = true;
     }
     notifyListeners();
   }
@@ -2678,13 +2742,20 @@ class CanvasModel with ChangeNotifier {
     _y += dy;
     if (isMobile) {
       isMobileCanvasChanged = true;
+    } else if (_isTabletCanvas) {
+      _tabletCanvasChanged = true;
     }
     notifyListeners();
   }
 
-  // mobile only
+  // Mobile, and desktop in tablet mode.
   updateScale(double v, Offset focalPoint) {
-    if (parent.target?.imageModel.image == null) return;
+    // Not `image != null`: the desktop texture render path leaves that null, and
+    // gating on it would make pinch a silent no-op in tablet mode.
+    if (parent.target?.imageModel.image == null &&
+        parent.target?.ffiModel.rect == null) {
+      return;
+    }
     final s = _scale;
     _scale *= v;
     final maxs = parent.target?.imageModel.maxScale ?? 1;
@@ -2700,12 +2771,15 @@ class CanvasModel with ChangeNotifier {
     _y = focalPoint.dy - adjust - (focalPoint.dy - _y - adjust) / s * _scale;
     if (isMobile) {
       isMobileCanvasChanged = true;
+    } else if (_isTabletCanvas) {
+      _tabletCanvasChanged = true;
     }
     notifyListeners();
   }
 
   // For reset canvas to the last view style
   reset() {
+    _tabletCanvasChanged = false;
     _scale = _lastViewStyle.scale;
     _devicePixelRatio = ui.window.devicePixelRatio;
     if (kIgnoreDpi && _lastViewStyle.style == kRemoteViewStyleOriginal) {
@@ -2720,6 +2794,7 @@ class CanvasModel with ChangeNotifier {
     _x = 0;
     _y = 0;
     _scale = 1.0;
+    _tabletCanvasChanged = false;
     _lastViewStyle = ViewStyle.defaultViewStyle();
     _timerMobileFocusCanvasCursor?.cancel();
     _timerMobileRestoreCanvasOffset?.cancel();

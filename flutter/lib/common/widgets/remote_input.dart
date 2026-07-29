@@ -113,7 +113,12 @@ class _RawTouchGestureDetectorRegionState
   FFI get ffi => widget.ffi;
   FfiModel get ffiModel => widget.ffiModel;
   InputModel get inputModel => widget.inputModel;
-  bool get handleTouch => (isDesktop || isWebDesktop) || ffiModel.touchMode;
+  // Desktop pinned this true, which left mouse mode unreachable there however the
+  // touch-mode option was set. In tablet mode desktop honours `touchMode` the way
+  // mobile does; with tablet mode off, desktop behaves exactly as it always has.
+  bool get handleTouch => ffiModel.tabletMode
+      ? ffiModel.touchMode
+      : ((isDesktop || isWebDesktop) || ffiModel.touchMode);
   SessionID get sessionId => ffi.sessionId;
 
   @override
@@ -311,12 +316,15 @@ class _RawTouchGestureDetectorRegionState
       return;
     }
 
-    // mobile mouse mode or desktop touch screen
-    final isMobileMouseMode = isMobile && !ffiModel.touchMode;
-    // We can't use `d.localPosition` here because it's always (0, 0) on desktop.
-    final isDesktopInRemoteRect = (isDesktop || isWebDesktop) &&
+    // Mouse mode -- mobile, or a desktop in tablet mode. The right click lands at
+    // the virtual cursor, not under the fingers, so there's no rect to check.
+    final isMouseMode = (isMobile || ffiModel.tabletMode) && !ffiModel.touchMode;
+    // Touch mode on desktop: the fingers are the cursor, so the tap has to be on
+    // the remote image. We can't use `d.localPosition`, it's always (0, 0) here.
+    final isTouchInRemoteRect = (isDesktop || isWebDesktop) &&
+        (!ffiModel.tabletMode || ffiModel.touchMode) &&
         ffi.cursorModel.isInRemoteRect(_doubleFinerTapPosition);
-    if (isMobileMouseMode || isDesktopInRemoteRect) {
+    if (isMouseMode || isTouchInRemoteRect) {
       await inputModel.tap(MouseButtons.right);
     }
   }
@@ -471,7 +479,9 @@ class _RawTouchGestureDetectorRegionState
       return;
     }
 
-    if ((isDesktop || isWebDesktop)) {
+    // Desktop forwards the pinch to the peer as a touch gesture. In tablet mode we
+    // want what mobile does instead: zoom our own view of the remote screen.
+    if ((isDesktop || isWebDesktop) && !ffiModel.tabletMode) {
       final scale = ((d.scale - _scale) * 1000).toInt();
       _scale = d.scale;
 
@@ -484,7 +494,7 @@ class _RawTouchGestureDetectorRegionState
                     .toJson()));
       }
     } else {
-      // mobile
+      // Mobile, and desktop in tablet mode.
       ffi.canvasModel.updateScale(d.scale / _scale, d.focalPoint);
       _scale = d.scale;
       ffi.canvasModel.panX(d.focalPointDelta.dx);
@@ -496,14 +506,14 @@ class _RawTouchGestureDetectorRegionState
     if (isNotTouchBasedDevice()) {
       return;
     }
-    if ((isDesktop || isWebDesktop)) {
+    if ((isDesktop || isWebDesktop) && !ffiModel.tabletMode) {
       if (widget.isCamera) return;
       await bind.sessionSendPointer(
           sessionId: sessionId,
           msg: json.encode(
               PointerEventToRust(kPointerEventKindTouch, 'scale', 0).toJson()));
     } else {
-      // mobile
+      // Mobile, and desktop in tablet mode.
       _scale = 1;
       // No idea why we need to set the view style to "" here.
       // bind.sessionSetViewStyle(sessionId: sessionId, value: "");

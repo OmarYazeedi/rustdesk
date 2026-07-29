@@ -2081,6 +2081,21 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    // This fork ships beside a stock RustDesk rather than replacing it. `APP_NAME`
+    // is what `Config::path` derives %APPDATA%\<org>\<app> from, so moving it gives
+    // this build its own config dir, peer list and device id -- nothing it does can
+    // disturb an existing install.
+    //
+    // Upstream's own rebranding route is a signed `custom.txt`, which needs
+    // RustDesk's private key (see `read_custom_client`), so it isn't open to us.
+    // Every entry point (core_main, flutter_ffi, service) already calls this
+    // function before any config path is resolved, which makes it the one hook
+    // that covers them all.
+    //
+    // Keeping "RustDesk" in the name is deliberate: `lang.rs` special-cases app
+    // names containing it so translated strings don't get double-substituted.
+    *config::APP_NAME.write().unwrap() = "RustDesk Touch".to_owned();
+
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
