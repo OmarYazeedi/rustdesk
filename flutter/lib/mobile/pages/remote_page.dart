@@ -67,6 +67,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   final _uniqueKey = UniqueKey();
   Timer? _iosKeyboardWorkaroundTimer;
 
+  // Frame rate is dropped while backgrounded and restored on return. Only ever
+  // applied temporarily, so the saved peer config never sees the throttled value.
+  bool _backgroundThrottled = false;
+  int? _preThrottleFps;
+
   final _blockableOverlayState = BlockableOverlayState();
 
   final keyboardVisibilityController = KeyboardVisibilityController();
@@ -194,9 +199,44 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Deliberately only `paused`/`hidden`, never `inactive`. An unfocused but
+    // still-visible window -- a freeform/floating window, or the notification
+    // shade pulled down over us -- reports `inactive`, and the user is looking
+    // right at it. Throttling that would show up as a stutter.
     if (state == AppLifecycleState.resumed) {
       trySyncClipboard();
+      _restoreVideoForForeground();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _throttleVideoForBackground();
     }
+  }
+
+  /// Cut the frame rate right down while the session is off-screen. The
+  /// connection is deliberately kept running (see the keep-alive service), so
+  /// without this a session sitting in the background streams video at full
+  /// rate into nothing, burning battery and mobile data.
+  Future<void> _throttleVideoForBackground() async {
+    if (_backgroundThrottled) return;
+    _backgroundThrottled = true;
+    // Read the live value rather than caching at init, so a mid-session change
+    // via the quality toolbar is preserved across the throttle.
+    final current =
+        await bind.sessionGetOption(sessionId: sessionId, arg: 'custom-fps');
+    if (!mounted || !_backgroundThrottled) return;
+    _preThrottleFps = int.tryParse(current ?? '') ?? kDefaultCustomFps;
+    // Throttled, not stopped: frames still trickling in are what keep the
+    // client's no-data timeout satisfied.
+    bind.sessionSetCustomFpsTemporarily(
+        sessionId: sessionId, fps: kBackgroundCustomFps);
+  }
+
+  void _restoreVideoForForeground() {
+    if (!_backgroundThrottled) return;
+    _backgroundThrottled = false;
+    bind.sessionSetCustomFpsTemporarily(
+        sessionId: sessionId, fps: _preThrottleFps ?? kDefaultCustomFps);
+    _preThrottleFps = null;
   }
 
   // For client side

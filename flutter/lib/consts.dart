@@ -146,6 +146,15 @@ const String kOptionTouchMode = "touch-mode";
 const String kOptionI444 = "i444";
 const String kOptionSwapLeftRightMouse = "swap-left-right-mouse";
 const String kOptionCodecPreference = "codec-preference";
+
+/// Frame rate assumed when a peer has no explicit `custom-fps` set. Matches the
+/// value upstream falls back to for non-custom image quality.
+const int kDefaultCustomFps = 30;
+
+/// Frame rate requested while a mobile session is backgrounded. Low enough to
+/// make the stream nearly free, but deliberately non-zero: the frames still
+/// arriving are what keep the connection's no-data timeout satisfied.
+const int kBackgroundCustomFps = 2;
 const String kOptionRemoteMenubarDragLeft = "remote-menubar-drag-left";
 const String kOptionRemoteMenubarDragRight = "remote-menubar-drag-right";
 const String kOptionRemoteMenubarEdge = "remote-menubar-edge";
