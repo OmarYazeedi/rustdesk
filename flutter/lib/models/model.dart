@@ -128,10 +128,14 @@ class FfiModel with ChangeNotifier {
   final RxBool tabletModeRx = false.obs;
   // The in-app touch keyboard (tablet mode only). Not persisted -- it's a
   // per-session, moment-to-moment thing, like the mobile soft keyboard.
+  // The in-app keyboard. No menu entry of its own any more -- it only appears
+  // automatically if neither Windows keyboard can be raised, as a last resort so
+  // there's always some way to type.
   final RxBool softKeyboardVisible = false.obs;
-  // Best-effort: the Windows keyboard is a system window we don't own, so this
-  // tracks what we last asked for rather than what's actually on screen.
+  // Best-effort: both Windows keyboards are system windows we don't own, so
+  // these track what we last asked for rather than what's actually on screen.
   final RxBool windowsKeyboardShown = false.obs;
+  final RxBool oskShown = false.obs;
   late VirtualMouseMode virtualMouseMode;
   Timer? _timer;
   Timer? _restartReconnectDelayTimer;

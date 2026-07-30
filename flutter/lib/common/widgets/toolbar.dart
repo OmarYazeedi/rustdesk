@@ -1247,36 +1247,45 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
       !isWeb &&
       ffiModel.keyboard &&
       !ffiModel.viewOnly) {
-    // Two entries rather than one that silently falls back. The system keyboard
-    // can't be driven reliably on every machine, and when it fails there's no way
-    // to tell that apart from a broken button -- so the in-app one stays directly
-    // reachable instead of being a hidden consolation prize.
+    // Two Windows keyboards, each doing exactly one thing. The modern touch
+    // keyboard is the nicer of the two but rides an undocumented COM interface
+    // and can't be relied on; the accessibility On-Screen Keyboard always comes
+    // up. Keeping them as separate toggles means neither can quietly do
+    // something other than what its label says.
     if (isWindows) {
       v.add(TToggleMenu(
           value: ffiModel.windowsKeyboardShown.value,
           onChanged: ffiModel.tabletMode
               ? (value) async {
-                  final shown = await WindowsTouchKeyboard.toggleSystemKeyboard();
-                  ffiModel.windowsKeyboardShown.value =
-                      shown && !ffiModel.windowsKeyboardShown.value;
-                  if (!shown) {
-                    // Neither the touch keyboard nor the OSK would come up. Put
-                    // the in-app one on screen so there's still a way to type.
+                  final wanted = !ffiModel.windowsKeyboardShown.value;
+                  if (await WindowsTouchKeyboard.toggleTouchKeyboard()) {
+                    ffiModel.windowsKeyboardShown.value = wanted;
+                    return;
+                  }
+                  // TabTip wouldn't come up. Rather than leaving a button that
+                  // does nothing, fall through to the keyboard that always
+                  // works, and reflect that in the toggle that owns it.
+                  if (WindowsTouchKeyboard.toggleOsk()) {
+                    ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
+                    return;
+                  }
+                  ffiModel.softKeyboardVisible.value = true;
+                }
+              : null,
+          child: Text(translate('Touch keyboard'))));
+      v.add(TToggleMenu(
+          value: ffiModel.oskShown.value,
+          onChanged: ffiModel.tabletMode
+              ? (value) {
+                  if (WindowsTouchKeyboard.toggleOsk()) {
+                    ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
+                  } else {
                     ffiModel.softKeyboardVisible.value = true;
                   }
                 }
               : null,
-          child: Text(translate('Windows keyboard'))));
+          child: Text(translate('On-screen keyboard'))));
     }
-    v.add(TToggleMenu(
-        value: ffiModel.softKeyboardVisible.value,
-        onChanged: ffiModel.tabletMode
-            ? (value) {
-                if (value == null) return;
-                ffiModel.softKeyboardVisible.value = value;
-              }
-            : null,
-        child: Text(translate('In-app keyboard'))));
   }
 
   // reverse mouse wheel

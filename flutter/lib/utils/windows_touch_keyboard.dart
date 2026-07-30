@@ -39,7 +39,7 @@ class WindowsTouchKeyboard {
   /// Toggles the touch keyboard. Returns false if it couldn't be driven at all,
   /// so the caller can fall back to the in-app keyboard rather than leaving the
   /// user with no way to type.
-  static Future<bool> toggle() async {
+  static Future<bool> toggleTouchKeyboard() async {
     if (!Platform.isWindows) return false;
     if (_tryToggle()) return true;
 
@@ -67,10 +67,13 @@ class WindowsTouchKeyboard {
     return false;
   }
 
-  /// The classic On-Screen Keyboard. Uglier than the touch keyboard and it's a
-  /// plain floating window, but it launches on every Windows version without COM
-  /// or undocumented interfaces -- so it's what's left when TabTip won't play.
+  /// Windows' accessibility On-Screen Keyboard (Settings > Accessibility >
+  /// Keyboard). A plain floating window rather than the modern touch keyboard,
+  /// but it launches on every Windows version with no COM and nothing
+  /// undocumented involved -- so unlike TabTip it can be relied on.
   static bool _oskShown = false;
+
+  static bool get oskShown => _oskShown;
 
   static bool toggleOsk() {
     if (!Platform.isWindows) return false;
@@ -89,12 +92,6 @@ class WindowsTouchKeyboard {
     }
   }
 
-  /// Try the touch keyboard, then the On-Screen Keyboard. False means neither
-  /// could be raised and the caller should fall back to the in-app keyboard.
-  static Future<bool> toggleSystemKeyboard() async {
-    if (await toggle()) return true;
-    return toggleOsk();
-  }
 
   static bool _tryToggle() {
     final arena = Arena();
