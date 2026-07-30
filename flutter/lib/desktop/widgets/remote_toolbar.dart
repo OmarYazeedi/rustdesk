@@ -338,9 +338,13 @@ class _ToolbarTheme {
   static const double height = 20.0;
   static const double dividerHeight = 12.0;
 
-  static const double buttonSize = 32;
-  static const double buttonHMargin = 2;
-  static const double buttonVMargin = 6;
+  // 32 is a mouse target. A finger needs roughly 44 (Apple's guidance) to 48
+  // (Material's minimum tap target); on a Surface at 150% scaling 32 logical
+  // pixels is about 5mm, which is why the toolbar can't be worked by touch.
+  // Only tablet mode grows -- a mouse-driven desktop keeps the compact toolbar.
+  static double get buttonSize => tabletModeGlobal.value ? 46 : 32;
+  static double get buttonHMargin => tabletModeGlobal.value ? 5 : 2;
+  static double get buttonVMargin => tabletModeGlobal.value ? 10 : 6;
   static const double iconRadius = 8;
   static const double elevation = 3;
 
@@ -373,6 +377,20 @@ class _ToolbarTheme {
     padding: MaterialStatePropertyAll(EdgeInsets.zero),
     overlayColor: MaterialStatePropertyAll(Colors.transparent),
   );
+
+  // Menu rows are laid out for a mouse and end up around 20px tall, which is
+  // unusable with a finger. Give them a finger-sized minimum in tablet mode,
+  // rather than restyling Flutter's whole menu theme and changing the look for
+  // every mouse user too.
+  static Widget touchSizedMenuChild(Widget? child) {
+    if (child == null) return const SizedBox.shrink();
+    if (!tabletModeGlobal.value) return child;
+    return Container(
+      alignment: AlignmentDirectional.centerStart,
+      constraints: const BoxConstraints(minHeight: 40),
+      child: child,
+    );
+  }
 
   static Widget borderWrapper(
       BuildContext context, Widget child, BorderRadius borderRadius) {
@@ -2995,7 +3013,7 @@ class MenuButton extends StatelessWidget {
               }
             : null,
         trailingIcon: trailingIcon,
-        child: child);
+        child: _ToolbarTheme.touchSizedMenuChild(child));
   }
 }
 
@@ -3017,7 +3035,7 @@ class CkbMenuButton extends StatelessWidget {
     return CheckboxMenuButton(
       key: key,
       value: value,
-      child: child,
+      child: _ToolbarTheme.touchSizedMenuChild(child),
       onChanged: onChanged != null
           ? (bool? value) {
               if (ffi != null) {

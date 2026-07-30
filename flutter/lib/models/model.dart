@@ -233,6 +233,7 @@ class FfiModel with ChangeNotifier {
 
   toggleTabletMode() {
     tabletModeRx.value = !tabletModeRx.value;
+    tabletModeGlobal.value = tabletModeRx.value;
     bind.mainSetLocalOption(
         key: kOptionTabletMode, value: tabletModeRx.value ? 'Y' : 'N');
     // The canvas free-pans and pinch-zooms only in tablet mode, so leaving it
@@ -1404,6 +1405,7 @@ class FfiModel with ChangeNotifier {
     if (isDesktop || isWebDesktop) {
       tabletModeRx.value =
           bind.mainGetLocalOption(key: kOptionTabletMode) == 'Y';
+      tabletModeGlobal.value = tabletModeRx.value;
     }
     if (isPeerAndroid) {
       _touchMode = true;

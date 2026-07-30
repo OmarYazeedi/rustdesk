@@ -62,6 +62,10 @@ final isWebOnWindows = isWebOnWindows_;
 final isWebOnLinux = isWebOnLinux_;
 final isWebOnMacOs = isWebOnMacOS_;
 var isMobile = isAndroid || isIOS;
+// Mirrors the `tablet-mode` local option. `FfiModel.tabletMode` is the per-session
+// source of truth, but the remote toolbar's metrics live on a static theme class
+// with no way to reach an FfiModel, and they have to grow for touch.
+final tabletModeGlobal = false.obs;
 var version = '';
 int androidVersion = 0;
 
