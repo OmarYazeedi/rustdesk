@@ -11,6 +11,7 @@ import 'package:flutter_hbb/models/state_model.dart';
 import '../../consts.dart';
 import '../../common/widgets/overlay.dart';
 import '../../common/widgets/remote_input.dart';
+import '../../common/widgets/floating_keyboard_button.dart';
 import '../../common/widgets/soft_keyboard.dart';
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
@@ -986,6 +987,15 @@ class _RemotePageState extends State<RemotePage>
             QualityMonitor(_ffi.qualityMonitorModel), null, null),
       ),
     );
+    // Floating keyboard button. Outside the gesture region so dragging it moves
+    // the button rather than the remote cursor.
+    paints.add(Obx(() {
+      if (!_ffi.ffiModel.tabletMode ||
+          _ffi.ffiModel.floatingKeyboardBtn.isFalse) {
+        return Offstage();
+      }
+      return Positioned.fill(child: FloatingKeyboardButton(ffi: _ffi));
+    }));
     // The in-app touch keyboard, docked to the bottom. Deliberately outside the
     // gesture region above so its taps are keys, not remote clicks.
     paints.add(Obx(() {

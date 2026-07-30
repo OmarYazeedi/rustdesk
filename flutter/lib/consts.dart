@@ -149,6 +149,12 @@ const String kOptionTouchMode = "touch-mode";
 // default -- a desktop with a touchscreen but a mouse in use should keep behaving
 // exactly as it does today.
 const String kOptionTabletMode = "tablet-mode";
+// The floating keyboard button: whether it's loose on the canvas or pinned away
+// into the toolbar, and where the user last left it. Position is stored as a
+// fraction of the viewport so it survives a resize or a display change.
+const String kOptionFloatingKeyboardBtn = "floating-keyboard-btn";
+const String kOptionFloatingKeyboardBtnX = "floating-keyboard-btn-x";
+const String kOptionFloatingKeyboardBtnY = "floating-keyboard-btn-y";
 const String kOptionI444 = "i444";
 const String kOptionSwapLeftRightMouse = "swap-left-right-mouse";
 const String kOptionCodecPreference = "codec-preference";

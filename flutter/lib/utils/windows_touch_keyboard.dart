@@ -166,6 +166,22 @@ class WindowsTouchKeyboard {
   }
 }
 
+/// Which keyboard actually came up, so callers can keep their UI honest about it
+/// instead of assuming the one they asked for.
+enum RaisedKeyboard { none, touch, osk }
+
+/// Raises whichever keyboard this machine will actually give us, preferring the
+/// modern touch keyboard. The floating button uses this -- its label is just
+/// "keyboard", so either one honours it. The toolbar entries deliberately don't:
+/// they name a specific keyboard and shouldn't silently raise the other.
+Future<RaisedKeyboard> toggleBestWindowsKeyboard() async {
+  if (await WindowsTouchKeyboard.toggleTouchKeyboard()) {
+    return RaisedKeyboard.touch;
+  }
+  if (WindowsTouchKeyboard.toggleOsk()) return RaisedKeyboard.osk;
+  return RaisedKeyboard.none;
+}
+
 final class _Guid extends Struct {
   @Uint32()
   external int d1;

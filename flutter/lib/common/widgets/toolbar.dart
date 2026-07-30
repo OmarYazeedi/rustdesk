@@ -1285,6 +1285,19 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
                 }
               : null,
           child: Text(translate('On-screen keyboard'))));
+      // Unticking this pins the floating button away; the entries above stay as
+      // the way back to a keyboard, so it can't strand you.
+      v.add(TToggleMenu(
+          value: ffiModel.floatingKeyboardBtn.value,
+          onChanged: ffiModel.tabletMode
+              ? (value) {
+                  if (value == null) return;
+                  ffiModel.floatingKeyboardBtn.value = value;
+                  bind.mainSetLocalOption(
+                      key: kOptionFloatingKeyboardBtn, value: value ? 'Y' : 'N');
+                }
+              : null,
+          child: Text(translate('Floating keyboard button'))));
     }
   }
 

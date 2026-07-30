@@ -136,6 +136,8 @@ class FfiModel with ChangeNotifier {
   // these track what we last asked for rather than what's actually on screen.
   final RxBool windowsKeyboardShown = false.obs;
   final RxBool oskShown = false.obs;
+  // The floating keyboard button. False means pinned away into the toolbar.
+  final RxBool floatingKeyboardBtn = true.obs;
   late VirtualMouseMode virtualMouseMode;
   Timer? _timer;
   Timer? _restartReconnectDelayTimer;
@@ -1413,6 +1415,10 @@ class FfiModel with ChangeNotifier {
       tabletModeRx.value =
           bind.mainGetLocalOption(key: kOptionTabletMode) == 'Y';
       tabletModeGlobal.value = tabletModeRx.value;
+      // Defaults on: the button is the point of tablet mode, and it's one tap to
+      // pin it away if it's in the road.
+      floatingKeyboardBtn.value =
+          bind.mainGetLocalOption(key: kOptionFloatingKeyboardBtn) != 'N';
     }
     if (isPeerAndroid) {
       _touchMode = true;
