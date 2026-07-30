@@ -15,7 +15,19 @@
 # completes and still uploads. A red arm64 job is expected and harmless here.
 name: Windows Touch Build
 
+# Triggers on push to the tablet-touch branch rather than only by hand. A
+# `workflow_dispatch` workflow gets its "Run workflow" button only when the file
+# is on the repository's default branch, and this one deliberately isn't -- it's
+# fork-only and shouldn't be pushed to master to earn a button. `push` has no such
+# requirement and uses the definition from the pushed branch, so every commit to
+# the branch builds on its own.
 on:
+  push:
+    branches:
+      - feat/windows-tablet-touch
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
   workflow_dispatch:
     inputs:
       upload-tag:
@@ -29,5 +41,7 @@ jobs:
     secrets: inherit
     with:
       upload-artifact: true
-      upload-tag: ${{ inputs.upload-tag }}
+      # `inputs` is empty on a push event, which would pass "" and override
+      # flutter-build's own default, so fall back explicitly.
+      upload-tag: ${{ inputs.upload-tag || 'windows-touch' }}
       windows-only: true
