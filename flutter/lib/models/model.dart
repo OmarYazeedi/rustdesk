@@ -126,6 +126,9 @@ class FfiModel with ChangeNotifier {
   // cursor overlay all branch on it from inside `Obx`, and a ChangeNotifier
   // field would leave those stale.
   final RxBool tabletModeRx = false.obs;
+  // The in-app touch keyboard (tablet mode only). Not persisted -- it's a
+  // per-session, moment-to-moment thing, like the mobile soft keyboard.
+  final RxBool softKeyboardVisible = false.obs;
   late VirtualMouseMode virtualMouseMode;
   Timer? _timer;
   Timer? _restartReconnectDelayTimer;
