@@ -3310,10 +3310,17 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
         // floats away from the top while dragging and the toolbar looks
         // unmoored. When multi-edge is on we need 2D drag for snap-to-edge.
         axis: widget.multiEdgeEnabled ? null : Axis.horizontal,
-        child: Icon(
-          widget.isHorizontal ? Icons.drag_indicator : Icons.drag_handle,
-          size: 20,
-          color: MyTheme.color(context).drag_indicator,
+        // A bare icon is its own hit area -- 20x20, which is far too small to
+        // grab with a finger. In tablet mode it gets a real target around it.
+        child: Container(
+          alignment: Alignment.center,
+          width: tabletModeGlobal.value ? 46 : null,
+          height: tabletModeGlobal.value ? 46 : null,
+          child: Icon(
+            widget.isHorizontal ? Icons.drag_indicator : Icons.drag_handle,
+            size: tabletModeGlobal.value ? 26 : 20,
+            color: MyTheme.color(context).drag_indicator,
+          ),
         ),
         feedback: widget,
         onDragStarted: () {
@@ -3338,12 +3345,20 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
 
   @override
   Widget build(BuildContext context) {
+    // This handle is the *outer* layer -- the strip holding expand, minimize and
+    // the drag grip, i.e. the thing you have to hit before the toolbar is even
+    // open. It has its own sizing, independent of `_ToolbarTheme.buttonSize`, so
+    // enlarging the buttons inside the expanded toolbar left this untouched and
+    // still unusable by touch.
+    final touch = tabletModeGlobal.value;
     final ButtonStyle buttonStyle = ButtonStyle(
-      minimumSize: MaterialStateProperty.all(const Size(0, 0)),
-      padding: MaterialStateProperty.all(EdgeInsets.zero),
+      minimumSize: MaterialStateProperty.all(
+          touch ? const Size(46, 46) : const Size(0, 0)),
+      padding: MaterialStateProperty.all(
+          touch ? const EdgeInsets.all(8) : EdgeInsets.zero),
     );
     final isFullscreen = stateGlobal.fullscreen;
-    const double iconSize = 20;
+    final double iconSize = touch ? 26 : 20;
 
     buttonWrapper(VoidCallback? onPressed, Widget child,
         {Color hoverColor = _ToolbarTheme.blueColor}) {

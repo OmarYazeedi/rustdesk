@@ -1247,27 +1247,36 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
       !isWeb &&
       ffiModel.keyboard &&
       !ffiModel.viewOnly) {
+    // Two entries rather than one that silently falls back. The system keyboard
+    // can't be driven reliably on every machine, and when it fails there's no way
+    // to tell that apart from a broken button -- so the in-app one stays directly
+    // reachable instead of being a hidden consolation prize.
+    if (isWindows) {
+      v.add(TToggleMenu(
+          value: ffiModel.windowsKeyboardShown.value,
+          onChanged: ffiModel.tabletMode
+              ? (value) async {
+                  final shown = await WindowsTouchKeyboard.toggleSystemKeyboard();
+                  ffiModel.windowsKeyboardShown.value =
+                      shown && !ffiModel.windowsKeyboardShown.value;
+                  if (!shown) {
+                    // Neither the touch keyboard nor the OSK would come up. Put
+                    // the in-app one on screen so there's still a way to type.
+                    ffiModel.softKeyboardVisible.value = true;
+                  }
+                }
+              : null,
+          child: Text(translate('Windows keyboard'))));
+    }
     v.add(TToggleMenu(
         value: ffiModel.softKeyboardVisible.value,
         onChanged: ffiModel.tabletMode
             ? (value) {
                 if (value == null) return;
-                // Prefer the real Windows touch keyboard -- it looks native and
-                // brings layouts, prediction and emoji the in-app one never
-                // will. Keystrokes reach the peer through RustDesk's existing
-                // low-level key hook, which sees injected input too.
-                if (isWindows && WindowsTouchKeyboard.toggle()) {
-                  // It's a system window; we don't own its visibility, so don't
-                  // pretend to track it with the in-app flag.
-                  ffiModel.softKeyboardVisible.value = false;
-                  return;
-                }
-                // Fall back to the in-app keyboard if the system one can't be
-                // driven -- better a plain keyboard than none.
                 ffiModel.softKeyboardVisible.value = value;
               }
             : null,
-        child: Text(translate('Touch keyboard'))));
+        child: Text(translate('In-app keyboard'))));
   }
 
   // reverse mouse wheel

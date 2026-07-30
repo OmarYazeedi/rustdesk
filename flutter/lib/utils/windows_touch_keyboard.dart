@@ -39,20 +39,61 @@ class WindowsTouchKeyboard {
   /// Toggles the touch keyboard. Returns false if it couldn't be driven at all,
   /// so the caller can fall back to the in-app keyboard rather than leaving the
   /// user with no way to type.
-  static bool toggle() {
+  static Future<bool> toggle() async {
     if (!Platform.isWindows) return false;
     if (_tryToggle()) return true;
-    // CoCreateInstance fails with REGDB_E_CLASSNOTREG when TabTip isn't running
-    // yet. Start it and try once more.
+
+    // CoCreateInstance fails with REGDB_E_CLASSNOTREG until TabTip is running.
+    // The first cut started TabTip and retried immediately, which cannot work --
+    // process start is asynchronous and the COM class isn't registered for a
+    // moment afterwards. Poll instead of guessing a single delay.
     try {
-      if (File(_tabTipPath).existsSync()) {
-        Process.start(_tabTipPath, const [], mode: ProcessStartMode.detached);
+      if (!File(_tabTipPath).existsSync()) {
+        debugPrint('WindowsTouchKeyboard: TabTip not found at $_tabTipPath');
+        return false;
       }
+      await Process.start(_tabTipPath, const [],
+          mode: ProcessStartMode.detached);
     } catch (e) {
       debugPrint('WindowsTouchKeyboard: could not start TabTip: $e');
       return false;
     }
-    return _tryToggle();
+
+    for (var i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      if (_tryToggle()) return true;
+    }
+    debugPrint('WindowsTouchKeyboard: TabTip started but Toggle never took');
+    return false;
+  }
+
+  /// The classic On-Screen Keyboard. Uglier than the touch keyboard and it's a
+  /// plain floating window, but it launches on every Windows version without COM
+  /// or undocumented interfaces -- so it's what's left when TabTip won't play.
+  static bool _oskShown = false;
+
+  static bool toggleOsk() {
+    if (!Platform.isWindows) return false;
+    try {
+      if (_oskShown) {
+        Process.runSync('taskkill', const ['/IM', 'osk.exe', '/F']);
+        _oskShown = false;
+      } else {
+        Process.start('osk.exe', const [], mode: ProcessStartMode.detached);
+        _oskShown = true;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('WindowsTouchKeyboard: osk.exe failed: $e');
+      return false;
+    }
+  }
+
+  /// Try the touch keyboard, then the On-Screen Keyboard. False means neither
+  /// could be raised and the caller should fall back to the in-app keyboard.
+  static Future<bool> toggleSystemKeyboard() async {
+    if (await toggle()) return true;
+    return toggleOsk();
   }
 
   static bool _tryToggle() {
