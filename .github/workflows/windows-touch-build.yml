@@ -1,0 +1,33 @@
+# Fork-only. Builds just the Windows Flutter client, for iterating on tablet
+# mode (touch/mouse mode, pinch zoom, the in-app touch keyboard).
+#
+# The existing callers -- ci.yml, flutter-nightly.yml, flutter-tag.yml -- all run
+# the full twelve-job matrix, which spends nine jobs on iOS, Android, Linux,
+# appimage, flatpak, web and the sciter clients. None of those are touched by this
+# work, so this passes `windows-only` and skips them.
+#
+# Run it from the Actions tab, picking the branch to build. The portable client
+# lands in the `rustdesk-unsigned-windows-x86_64` artifact.
+#
+# Note: the Windows job's matrix also has an aarch64 entry that needs a
+# `windows-11-arm` runner. Those may be unavailable on a personal fork, in which
+# case that one job fails -- `fail-fast: false` means the x86_64 build still
+# completes and still uploads. A red arm64 job is expected and harmless here.
+name: Windows Touch Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload-tag:
+        description: "Tag to label the uploaded artifacts with."
+        type: string
+        default: "windows-touch"
+
+jobs:
+  build-windows-only:
+    uses: ./.github/workflows/flutter-build.yml
+    secrets: inherit
+    with:
+      upload-artifact: true
+      upload-tag: ${{ inputs.upload-tag }}
+      windows-only: true
