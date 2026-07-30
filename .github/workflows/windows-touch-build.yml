@@ -35,6 +35,14 @@ on:
         type: string
         default: "windows-touch"
 
+# One run per branch at a time. Three pushes in quick succession put three runs in
+# flight at once, all publishing to the same release tag and racing to overwrite
+# each other's assets -- whichever finished last won, which is not necessarily the
+# newest code. Superseded runs are cancelled instead.
+concurrency:
+  group: windows-touch-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-windows-only:
     uses: ./.github/workflows/flutter-build.yml
