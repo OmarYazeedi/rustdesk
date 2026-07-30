@@ -12,6 +12,7 @@ import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
+import 'package:flutter_hbb/utils/windows_touch_keyboard.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1251,6 +1252,18 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
         onChanged: ffiModel.tabletMode
             ? (value) {
                 if (value == null) return;
+                // Prefer the real Windows touch keyboard -- it looks native and
+                // brings layouts, prediction and emoji the in-app one never
+                // will. Keystrokes reach the peer through RustDesk's existing
+                // low-level key hook, which sees injected input too.
+                if (isWindows && WindowsTouchKeyboard.toggle()) {
+                  // It's a system window; we don't own its visibility, so don't
+                  // pretend to track it with the in-app flag.
+                  ffiModel.softKeyboardVisible.value = false;
+                  return;
+                }
+                // Fall back to the in-app keyboard if the system one can't be
+                // driven -- better a plain keyboard than none.
                 ffiModel.softKeyboardVisible.value = value;
               }
             : null,
