@@ -1219,19 +1219,22 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
 
   // Touch vs mouse mode, the switch mobile puts in its GestureHelp sheet. Only
   // meaningful once tablet mode is on -- with it off, desktop pins touch mode.
-  if (isDesktop &&
-      isDefaultConn &&
-      !isWeb &&
-      ffiModel.tabletMode &&
-      !ffiModel.viewOnly) {
+  // Present whenever the session could use it, greyed out until tablet mode is
+  // on. Gating its *existence* on tablet mode meant the menu had to be closed and
+  // reopened before the toggle you actually came for showed up -- the list is
+  // built once, when the menu opens.
+  if (isDesktop && isDefaultConn && !isWeb && !ffiModel.viewOnly) {
     v.add(TToggleMenu(
         value: !ffiModel.touchMode,
-        onChanged: (value) {
-          if (value == null) return;
-          ffiModel.toggleTouchMode();
-          bind.mainSetLocalOption(
-              key: kOptionTouchMode, value: ffiModel.touchMode ? 'Y' : 'N');
-        },
+        onChanged: ffiModel.tabletMode
+            ? (value) {
+                if (value == null) return;
+                ffiModel.toggleTouchMode();
+                bind.mainSetLocalOption(
+                    key: kOptionTouchMode,
+                    value: ffiModel.touchMode ? 'Y' : 'N');
+              }
+            : null,
         child: Text(translate('Mouse mode'))));
   }
 
@@ -1241,15 +1244,16 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
   if (isDesktop &&
       isDefaultConn &&
       !isWeb &&
-      ffiModel.tabletMode &&
       ffiModel.keyboard &&
       !ffiModel.viewOnly) {
     v.add(TToggleMenu(
         value: ffiModel.softKeyboardVisible.value,
-        onChanged: (value) {
-          if (value == null) return;
-          ffiModel.softKeyboardVisible.value = value;
-        },
+        onChanged: ffiModel.tabletMode
+            ? (value) {
+                if (value == null) return;
+                ffiModel.softKeyboardVisible.value = value;
+              }
+            : null,
         child: Text(translate('Touch keyboard'))));
   }
 

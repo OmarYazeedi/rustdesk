@@ -2014,6 +2014,16 @@ class ImageModel with ChangeNotifier {
     if (image != null) notifyListeners();
   }
 
+  /// True once there is a frame's geometry to work against.
+  ///
+  /// Deliberately not `image != null`. The desktop texture render path never
+  /// populates `_image` -- the frame lives in a GPU texture -- so any code gated
+  /// on the image alone becomes a silent no-op on desktop. That bit the canvas
+  /// scale limits, pinch zoom, and the mouse-mode cursor glide in turn. The
+  /// display rect is set on every path, so gate on either.
+  bool get hasFrameGeometry =>
+      _image != null || parent.target?.ffiModel.rect != null;
+
   // The source size the canvas scale limits are measured against. Prefer the
   // decoded image, but the desktop texture render path never populates `_image`,
   // so fall back to the display rect -- which is set either way. Without the
@@ -2753,12 +2763,7 @@ class CanvasModel with ChangeNotifier {
 
   // Mobile, and desktop in tablet mode.
   updateScale(double v, Offset focalPoint) {
-    // Not `image != null`: the desktop texture render path leaves that null, and
-    // gating on it would make pinch a silent no-op in tablet mode.
-    if (parent.target?.imageModel.image == null &&
-        parent.target?.ffiModel.rect == null) {
-      return;
-    }
+    if (!(parent.target?.imageModel.hasFrameGeometry ?? false)) return;
     final s = _scale;
     _scale *= v;
     final maxs = parent.target?.imageModel.maxScale ?? 1;
@@ -3293,7 +3298,9 @@ class CursorModel with ChangeNotifier {
     }
     double dx = delta.dx;
     double dy = delta.dy;
-    if (parent.target?.imageModel.image == null) return;
+    // Was `imageModel.image == null`, which is always true on desktop's texture
+    // render path -- so mouse-mode glide returned here without moving anything.
+    if (!(parent.target?.imageModel.hasFrameGeometry ?? false)) return;
     final scale = parent.target?.canvasModel.scale ?? 1.0;
     dx /= scale;
     dy /= scale;
