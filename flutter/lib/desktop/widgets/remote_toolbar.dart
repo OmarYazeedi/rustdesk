@@ -1015,6 +1015,13 @@ class _TouchKeyboardToggle extends StatelessWidget {
               ffi.ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
               break;
             case RaisedKeyboard.none:
+              // Neither Windows keyboard would come up. Say why on screen rather
+              // than silently swapping in the in-app one and leaving the reason
+              // in a file nobody knows to look for.
+              showToast(
+                  'Windows keyboard unavailable — using the in-app one.\n'
+                  '${WindowsTouchKeyboard.lastDiagnostic}',
+                  timeout: const Duration(seconds: 8));
               ffi.ffiModel.softKeyboardVisible.value =
                   !ffi.ffiModel.softKeyboardVisible.value;
               break;

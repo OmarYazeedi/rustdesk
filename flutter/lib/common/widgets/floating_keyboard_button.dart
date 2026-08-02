@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
@@ -70,7 +71,11 @@ class _FloatingKeyboardButtonState extends State<FloatingKeyboardButton> {
         break;
       case RaisedKeyboard.none:
         // Neither Windows keyboard would come up; fall back to the in-app one so
-        // the button always does something.
+        // the button always does something, and say why on screen.
+        showToast(
+            'Windows keyboard unavailable — using the in-app one.\n'
+            '${WindowsTouchKeyboard.lastDiagnostic}',
+            timeout: const Duration(seconds: 8));
         ffiModel.softKeyboardVisible.value =
             !ffiModel.softKeyboardVisible.value;
         break;
