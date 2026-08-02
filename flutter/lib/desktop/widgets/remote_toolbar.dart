@@ -20,6 +20,7 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_size/window_size.dart' as window_size;
 
 import '../../common.dart';
+import '../../utils/windows_touch_keyboard.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
@@ -865,6 +866,12 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     // Do not show keyboard for camera connection type.
     if (widget.ffi.connType == ConnType.defaultConn) {
       toolbarItems.add(_KeyboardMenu(id: widget.id, ffi: widget.ffi));
+      // A one-tap keyboard toggle sitting in the toolbar itself, not buried in a
+      // menu. Typing is the thing you reach for most on a tablet, and it was
+      // three taps away.
+      if (isWindows) {
+        toolbarItems.add(_TouchKeyboardToggle(ffi: widget.ffi));
+      }
     }
     toolbarItems.add(_ChatMenu(id: widget.id, ffi: widget.ffi));
     if (!isWeb) {
@@ -970,6 +977,55 @@ class _PinMenu extends StatelessWidget {
             : _ToolbarTheme.hoverInactiveColor,
       ),
     );
+  }
+}
+
+/// Fixed keyboard toggle in the toolbar row.
+///
+/// Raises whichever keyboard the machine will actually give us: the modern touch
+/// keyboard first, then the accessibility On-Screen Keyboard, then the in-app one
+/// as a last resort. The touch keyboard rides an undocumented COM interface and
+/// has not proved reliable, so the point of the ordering is that the button
+/// always produces *a* keyboard rather than nothing.
+///
+/// Only in tablet mode -- a mouse-driven desktop has a real keyboard.
+class _TouchKeyboardToggle extends StatelessWidget {
+  final FFI ffi;
+  const _TouchKeyboardToggle({Key? key, required this.ffi}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (!ffi.ffiModel.tabletMode) return const Offstage();
+      final shown = ffi.ffiModel.windowsKeyboardShown.value ||
+          ffi.ffiModel.oskShown.value ||
+          ffi.ffiModel.softKeyboardVisible.value;
+      return _IconMenuButton(
+        icon: Icon(Icons.keyboard,
+            size: tabletModeGlobal.value ? 26 : 20, color: Colors.white),
+        tooltip: shown ? 'Hide keyboard' : 'Show keyboard',
+        onPressed: () async {
+          final raised = await toggleBestWindowsKeyboard();
+          switch (raised) {
+            case RaisedKeyboard.touch:
+              ffi.ffiModel.windowsKeyboardShown.value =
+                  !ffi.ffiModel.windowsKeyboardShown.value;
+              break;
+            case RaisedKeyboard.osk:
+              ffi.ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
+              break;
+            case RaisedKeyboard.none:
+              ffi.ffiModel.softKeyboardVisible.value =
+                  !ffi.ffiModel.softKeyboardVisible.value;
+              break;
+          }
+        },
+        color: shown ? _ToolbarTheme.blueColor : _ToolbarTheme.inactiveColor,
+        hoverColor: shown
+            ? _ToolbarTheme.hoverBlueColor
+            : _ToolbarTheme.hoverInactiveColor,
+      );
+    });
   }
 }
 
