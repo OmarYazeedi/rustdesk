@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_hbb/common.dart';
 
 /// Shows and hides the real Windows touch keyboard (TabTip).
 ///
@@ -36,6 +37,53 @@ class WindowsTouchKeyboard {
   static const _tabTipPath =
       r'C:\Program Files\Common Files\microsoft shared\ink\TabTip.exe';
 
+  /// Why the last attempt went the way it did.
+  ///
+  /// `debugPrint` is useless here: a released Windows app has no console
+  /// attached, so anything printed goes nowhere and there is nothing to find in
+  /// a log afterwards. This is kept so the UI can show the reason directly, and
+  /// it's also written next to the config so it can be sent on.
+  static String lastDiagnostic = '';
+
+  static final List<String> _steps = [];
+
+  static void _note(String s) {
+    _steps.add(s);
+    debugPrint('WindowsTouchKeyboard: $s');
+  }
+
+  /// Common HRESULTs, named. A bare 0x80040154 tells you nothing at a glance.
+  static String _hr(int hr) {
+    final hex = '0x${(hr & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0')}';
+    switch (hr & 0xFFFFFFFF) {
+      case 0x80040154:
+        return '$hex REGDB_E_CLASSNOTREG (TabTip not running / class absent)';
+      case 0x80070005:
+        return '$hex E_ACCESSDENIED';
+      case 0x800401F0:
+        return '$hex CO_E_NOTINITIALIZED';
+      case 0x80004002:
+        return '$hex E_NOINTERFACE (ITipInvocation not supported here)';
+      default:
+        return hex;
+    }
+  }
+
+  static void finishDiagnostic() {
+    lastDiagnostic = _steps.join('\n');
+    _steps.clear();
+    try {
+      final appData = Platform.environment['APPDATA'];
+      if (appData == null) return;
+      final dir = Directory('$appData\\RustDesk Touch');
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      File('${dir.path}\\keyboard-diagnostic.txt')
+          .writeAsStringSync('$lastDiagnostic\n');
+    } catch (_) {
+      // Diagnostics must never be the thing that breaks the feature.
+    }
+  }
+
   /// Toggles the touch keyboard. Returns false if it couldn't be driven at all,
   /// so the caller can fall back to the in-app keyboard rather than leaving the
   /// user with no way to type.
@@ -49,13 +97,14 @@ class WindowsTouchKeyboard {
     // moment afterwards. Poll instead of guessing a single delay.
     try {
       if (!File(_tabTipPath).existsSync()) {
-        debugPrint('WindowsTouchKeyboard: TabTip not found at $_tabTipPath');
+        _note('TabTip.exe not present at $_tabTipPath');
         return false;
       }
       await Process.start(_tabTipPath, const [],
           mode: ProcessStartMode.detached);
+      _note('started TabTip.exe');
     } catch (e) {
-      debugPrint('WindowsTouchKeyboard: could not start TabTip: $e');
+      _note('could not start TabTip.exe: $e');
       return false;
     }
 
@@ -63,7 +112,7 @@ class WindowsTouchKeyboard {
       await Future.delayed(const Duration(milliseconds: 250));
       if (_tryToggle()) return true;
     }
-    debugPrint('WindowsTouchKeyboard: TabTip started but Toggle never took');
+    _note('TabTip started but Toggle never took after 2.5s');
     return false;
   }
 
@@ -81,13 +130,15 @@ class WindowsTouchKeyboard {
       if (_oskShown) {
         Process.runSync('taskkill', const ['/IM', 'osk.exe', '/F']);
         _oskShown = false;
+        _note('osk.exe killed');
       } else {
         Process.start('osk.exe', const [], mode: ProcessStartMode.detached);
         _oskShown = true;
+        _note('osk.exe started');
       }
       return true;
     } catch (e) {
-      debugPrint('WindowsTouchKeyboard: osk.exe failed: $e');
+      _note('osk.exe failed: $e');
       return false;
     }
   }
@@ -124,7 +175,7 @@ class WindowsTouchKeyboard {
       // CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER
       final hr = coCreateInstance(clsid, nullptr, 0x1 | 0x10, iid, ppv);
       if (hr != 0 || ppv.value == nullptr) {
-        debugPrint('WindowsTouchKeyboard: CoCreateInstance failed, hr=$hr');
+        _note('CoCreateInstance(UIHostNoLaunch) -> ${_hr(hr)}');
         return false;
       }
 
@@ -144,12 +195,13 @@ class WindowsTouchKeyboard {
       final toggleHr = toggle(obj, getDesktopWindow());
       release(obj);
       if (toggleHr != 0) {
-        debugPrint('WindowsTouchKeyboard: Toggle failed, hr=$toggleHr');
+        _note('ITipInvocation::Toggle -> ${_hr(toggleHr)}');
         return false;
       }
+      _note('ITipInvocation::Toggle -> ok');
       return true;
     } catch (e) {
-      debugPrint('WindowsTouchKeyboard: $e');
+      _note('COM path threw: $e');
       return false;
     } finally {
       arena.releaseAll();
@@ -175,11 +227,24 @@ enum RaisedKeyboard { none, touch, osk }
 /// "keyboard", so either one honours it. The toolbar entries deliberately don't:
 /// they name a specific keyboard and shouldn't silently raise the other.
 Future<RaisedKeyboard> toggleBestWindowsKeyboard() async {
+  RaisedKeyboard result;
   if (await WindowsTouchKeyboard.toggleTouchKeyboard()) {
-    return RaisedKeyboard.touch;
+    result = RaisedKeyboard.touch;
+  } else if (WindowsTouchKeyboard.toggleOsk()) {
+    result = RaisedKeyboard.osk;
+  } else {
+    result = RaisedKeyboard.none;
   }
-  if (WindowsTouchKeyboard.toggleOsk()) return RaisedKeyboard.osk;
-  return RaisedKeyboard.none;
+  WindowsTouchKeyboard.finishDiagnostic();
+  // Say when the nice keyboard couldn't be had, rather than quietly producing a
+  // different one and leaving it looking like a bug. The full reason is in
+  // %APPDATA%\RustDesk Touch\keyboard-diagnostic.txt.
+  if (result != RaisedKeyboard.touch) {
+    showToast(result == RaisedKeyboard.osk
+        ? 'Touch keyboard unavailable - using On-Screen Keyboard'
+        : 'No Windows keyboard available - using the in-app one');
+  }
+  return result;
 }
 
 final class _Guid extends Struct {
