@@ -124,18 +124,33 @@ class WindowsTouchKeyboard {
 
   static bool get oskShown => _oskShown;
 
-  static bool toggleOsk() {
+  static Future<bool> toggleOsk() async {
     if (!Platform.isWindows) return false;
     try {
       if (_oskShown) {
-        Process.runSync('taskkill', const ['/IM', 'osk.exe', '/F']);
+        final r = Process.runSync('taskkill', const ['/IM', 'osk.exe', '/F']);
         _oskShown = false;
-        _note('osk.exe killed');
-      } else {
-        Process.start('osk.exe', const [], mode: ProcessStartMode.detached);
-        _oskShown = true;
-        _note('osk.exe started');
+        _note('taskkill osk.exe -> exit ${r.exitCode} ${r.stderr}'.trim());
+        return true;
       }
+      // Awaited deliberately. `Process.start` returns a Future, so an unawaited
+      // call reports its failure as an unhandled async error that the try/catch
+      // here never sees -- which meant a launch that failed still set _oskShown
+      // and claimed success.
+      //
+      // System32 is spelled out rather than relying on PATH: on 64-bit Windows a
+      // bare "osk.exe" is subject to WOW64 redirection, and osk.exe does not
+      // exist under SysWOW64.
+      final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+      final osk = '$root\\System32\\osk.exe';
+      if (!File(osk).existsSync()) {
+        _note('osk.exe not found at $osk');
+        return false;
+      }
+      final p = await Process.start(osk, const [],
+          mode: ProcessStartMode.detached);
+      _oskShown = true;
+      _note('osk.exe started, pid ${p.pid}');
       return true;
     } catch (e) {
       _note('osk.exe failed: $e');
@@ -230,7 +245,7 @@ Future<RaisedKeyboard> toggleBestWindowsKeyboard() async {
   RaisedKeyboard result;
   if (await WindowsTouchKeyboard.toggleTouchKeyboard()) {
     result = RaisedKeyboard.touch;
-  } else if (WindowsTouchKeyboard.toggleOsk()) {
+  } else if (await WindowsTouchKeyboard.toggleOsk()) {
     result = RaisedKeyboard.osk;
   } else {
     result = RaisedKeyboard.none;

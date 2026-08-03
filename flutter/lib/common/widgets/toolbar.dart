@@ -1265,7 +1265,7 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
                   // TabTip wouldn't come up. Rather than leaving a button that
                   // does nothing, fall through to the keyboard that always
                   // works, and reflect that in the toggle that owns it.
-                  if (WindowsTouchKeyboard.toggleOsk()) {
+                  if (await WindowsTouchKeyboard.toggleOsk()) {
                     ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
                     return;
                   }
@@ -1276,8 +1276,8 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
       v.add(TToggleMenu(
           value: ffiModel.oskShown.value,
           onChanged: ffiModel.tabletMode
-              ? (value) {
-                  if (WindowsTouchKeyboard.toggleOsk()) {
+              ? (value) async {
+                  if (await WindowsTouchKeyboard.toggleOsk()) {
                     ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
                   } else {
                     ffiModel.softKeyboardVisible.value = true;
