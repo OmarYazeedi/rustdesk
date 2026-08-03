@@ -100,9 +100,11 @@ class WindowsTouchKeyboard {
         _note('TabTip.exe not present at $_tabTipPath');
         return false;
       }
-      await Process.start(_tabTipPath, const [],
-          mode: ProcessStartMode.detached);
-      _note('started TabTip.exe');
+      if (!_shellExecute(_tabTipPath)) {
+        _note('could not start TabTip.exe');
+        return false;
+      }
+      _note('started TabTip.exe via ShellExecute');
     } catch (e) {
       _note('could not start TabTip.exe: $e');
       return false;
@@ -123,6 +125,41 @@ class WindowsTouchKeyboard {
   static bool _oskShown = false;
 
   static bool get oskShown => _oskShown;
+
+  /// Launch via `ShellExecuteW` rather than `Process.start`.
+  ///
+  /// TabTip.exe is marked `uiAccess="true"` in its manifest. `CreateProcess` --
+  /// which is what Dart's `Process.start` uses -- refuses to launch a uiAccess
+  /// binary and fails with ERROR_ELEVATION_REQUIRED ("The requested operation
+  /// requires elevation"), whether or not elevation is genuinely involved.
+  /// ShellExecute goes through the shell's broker and starts it correctly.
+  static bool _shellExecute(String path) {
+    final arena = Arena();
+    try {
+      final shell32 = DynamicLibrary.open('shell32.dll');
+      final shellExecuteW = shell32.lookupFunction<
+          IntPtr Function(IntPtr, Pointer<Utf16>, Pointer<Utf16>,
+              Pointer<Utf16>, Pointer<Utf16>, Int32),
+          int Function(int, Pointer<Utf16>, Pointer<Utf16>, Pointer<Utf16>,
+              Pointer<Utf16>, int)>('ShellExecuteW');
+      final rc = shellExecuteW(
+        0,
+        'open'.toNativeUtf16(allocator: arena),
+        path.toNativeUtf16(allocator: arena),
+        nullptr,
+        nullptr,
+        1, // SW_SHOWNORMAL
+      );
+      // ShellExecute returns >32 on success; anything else is an error code.
+      _note('ShellExecuteW -> $rc${rc > 32 ? '' : ' (failed)'}');
+      return rc > 32;
+    } catch (e) {
+      _note('ShellExecuteW threw: $e');
+      return false;
+    } finally {
+      arena.releaseAll();
+    }
+  }
 
   static Future<bool> toggleOsk() async {
     if (!Platform.isWindows) return false;
