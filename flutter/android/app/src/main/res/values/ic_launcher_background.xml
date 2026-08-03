@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#ffffff</color>
+    <!-- Amber instead of upstream's white, so this build is tellable apart at a
+         glance from a stock RustDesk sitting next to it in the launcher. -->
+    <color name="ic_launcher_background">#FFB300</color>
 </resources>

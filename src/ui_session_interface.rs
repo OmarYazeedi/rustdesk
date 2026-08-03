@@ -507,6 +507,15 @@ impl<T: InvokeUiSession> Session<T> {
         self.send(Data::Message(msg));
     }
 
+    /// Change the frame rate for this connection only, leaving the saved peer
+    /// config alone. Mobile throttles the stream while it is backgrounded, and
+    /// that value must never reach the config -- if the app were killed while
+    /// throttled, the next session would silently start at a crawl.
+    pub fn set_custom_fps_temporarily(&self, custom_fps: i32) {
+        let msg = self.lc.write().unwrap().set_custom_fps(custom_fps, false);
+        self.send(Data::Message(msg));
+    }
+
     pub fn get_remember(&self) -> bool {
         self.lc.read().unwrap().remember
     }

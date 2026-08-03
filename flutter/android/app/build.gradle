@@ -32,6 +32,23 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Identity for this fork's builds. Upstream's version alone is not enough: every
+// build called itself 1.4.9, so an installed APK could not be told apart from the
+// one before it, nor traced back to the source that produced it.
+// BUMP bgBuild FOR EVERY BUILD HANDED OVER, not just for "releases".
+def bgBuild = 4
+def bgCommit = 'nogit'
+try {
+    def proc = 'git rev-parse --short=7 HEAD'.execute([], rootProject.projectDir)
+    def sha = proc.inputStream.text.trim()
+    proc.waitFor()
+    if (proc.exitValue() == 0 && !sha.isEmpty()) {
+        bgCommit = sha
+    }
+} catch (Exception ignored) {
+    // Built outside a git checkout -- keep the placeholder rather than fail the build.
+}
+
 // Add rustls-platform-verifier Android support
 String findRustlsPlatformVerifierMavenDir() {
     def dependencyText = providers.exec {
@@ -97,11 +114,17 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "com.carriez.flutter_hbb"
+        // Distinct from upstream's com.carriez.flutter_hbb so this build installs
+        // alongside a stock RustDesk rather than replacing it. Only the
+        // applicationId moves -- the Kotlin package (and so every JNI class path
+        // the Rust side looks up) stays com.carriez.flutter_hbb.
+        applicationId "com.ihportals.app"
         minSdkVersion 22
         targetSdkVersion 33
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        // Multiplied so each upstream version has room for its own run of BG
+        // builds while staying monotonic when upstream bumps (67999 < 68000).
+        versionCode flutterVersionCode.toInteger() * 1000 + bgBuild
+        versionName "${flutterVersionName}-bg.${bgBuild}+${bgCommit}"
     }
 
     signingConfigs {

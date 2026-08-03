@@ -537,6 +537,14 @@ pub fn session_set_custom_fps(session_id: SessionID, fps: i32) {
     }
 }
 
+// Unlike `session_set_custom_fps`, this does not write the value to the peer
+// config. For transient changes only -- see `set_custom_fps_temporarily`.
+pub fn session_set_custom_fps_temporarily(session_id: SessionID, fps: i32) {
+    if let Some(session) = sessions::get_session_by_session_id(&session_id) {
+        session.set_custom_fps_temporarily(fps);
+    }
+}
+
 pub fn session_get_trackpad_speed(session_id: SessionID) -> Option<i32> {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         Some(session.get_trackpad_speed())

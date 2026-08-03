@@ -106,6 +106,9 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         Log.e(logTag, "onDestroy")
+        // Backstop: no outgoing session can outlive the activity, so make sure the
+        // keep-alive never strands its notification if Dart's dispose() was cut short.
+        SessionKeepAliveService.stop(this)
         mainService?.let {
             unbindService(serviceConnection)
         }
@@ -229,6 +232,14 @@ class MainActivity : FlutterActivity() {
                 }
                 "try_sync_clipboard" -> {
                     rdClipboardManager?.syncClipboard(true)
+                    result.success(true)
+                }
+                START_SESSION_KEEP_ALIVE -> {
+                    SessionKeepAliveService.start(context)
+                    result.success(true)
+                }
+                STOP_SESSION_KEEP_ALIVE -> {
+                    SessionKeepAliveService.stop(context)
                     result.success(true)
                 }
                 GET_START_ON_BOOT_OPT -> {

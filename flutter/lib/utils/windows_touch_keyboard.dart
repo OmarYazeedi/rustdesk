@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/models/platform_model.dart';
 
 /// Shows and hides the real Windows touch keyboard (TabTip).
 ///
@@ -75,7 +76,10 @@ class WindowsTouchKeyboard {
     try {
       final appData = Platform.environment['APPDATA'];
       if (appData == null) return;
-      final dir = Directory('$appData\\RustDesk Touch');
+      // Asked for rather than hardcoded: the config dir is named after APP_NAME,
+      // so a hardcoded copy silently writes to the old folder the moment the app
+      // is renamed -- which is exactly what a rebrand would have done here.
+      final dir = Directory('$appData\\${bind.mainGetAppNameSync()}');
       if (!dir.existsSync()) dir.createSync(recursive: true);
       File('${dir.path}\\keyboard-diagnostic.txt')
           .writeAsStringSync('$lastDiagnostic\n');
@@ -290,7 +294,7 @@ Future<RaisedKeyboard> toggleBestWindowsKeyboard() async {
   WindowsTouchKeyboard.finishDiagnostic();
   // Say when the nice keyboard couldn't be had, rather than quietly producing a
   // different one and leaving it looking like a bug. The full reason is in
-  // %APPDATA%\RustDesk Touch\keyboard-diagnostic.txt.
+  // %APPDATA%\<app name>\keyboard-diagnostic.txt.
   if (result != RaisedKeyboard.touch) {
     showToast(result == RaisedKeyboard.osk
         ? 'Touch keyboard unavailable - using On-Screen Keyboard'

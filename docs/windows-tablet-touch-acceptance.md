@@ -1,6 +1,6 @@
 # Tablet mode — acceptance checklist
 
-For the first run of the `RustDesk Touch` build on the Surface Go 3, controlling
+For the first run of the `IHPortals` build on the Surface Go 3, controlling
 the desktop. Nothing below has been exercised on hardware; this is the list that
 turns "it compiles" into "it works".
 
@@ -13,7 +13,7 @@ reports as a mouse and none of the touch paths are exercised.
 
 ## 0. It's a separate app
 
-- [ ] Window title and Task Manager say **RustDesk Touch**, not RustDesk.
+- [ ] Window title and Task Manager say **IHPortals**, not RustDesk.
 - [ ] `%APPDATA%` has its own config dir; your existing RustDesk install is
       untouched and still has its peer list.
 - [ ] Expect a **fresh device ID and an empty peer list** — that's the point of

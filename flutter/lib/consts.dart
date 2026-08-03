@@ -158,6 +158,15 @@ const String kOptionFloatingKeyboardBtnY = "floating-keyboard-btn-y";
 const String kOptionI444 = "i444";
 const String kOptionSwapLeftRightMouse = "swap-left-right-mouse";
 const String kOptionCodecPreference = "codec-preference";
+
+/// Frame rate assumed when a peer has no explicit `custom-fps` set. Matches the
+/// value upstream falls back to for non-custom image quality.
+const int kDefaultCustomFps = 30;
+
+/// Frame rate requested while a mobile session is backgrounded. Low enough to
+/// make the stream nearly free, but deliberately non-zero: the frames still
+/// arriving are what keep the connection's no-data timeout satisfied.
+const int kBackgroundCustomFps = 2;
 const String kOptionRemoteMenubarDragLeft = "remote-menubar-drag-left";
 const String kOptionRemoteMenubarDragRight = "remote-menubar-drag-right";
 const String kOptionRemoteMenubarEdge = "remote-menubar-edge";
@@ -464,6 +473,8 @@ class AndroidChannel {
   static final kGetStartOnBootOpt = "get_start_on_boot_opt";
   static final kSetStartOnBootOpt = "set_start_on_boot_opt";
   static final kSyncAppDirConfigPath = "sync_app_dir";
+  static final kStartSessionKeepAlive = "start_session_keep_alive";
+  static final kStopSessionKeepAlive = "stop_session_keep_alive";
 }
 
 /// flutter/packages/flutter/lib/src/services/keyboard_key.dart -> _keyLabels

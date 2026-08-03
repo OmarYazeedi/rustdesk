@@ -2094,7 +2094,7 @@ pub fn load_custom_client() {
     //
     // Keeping "RustDesk" in the name is deliberate: `lang.rs` special-cases app
     // names containing it so translated strings don't get double-substituted.
-    *config::APP_NAME.write().unwrap() = "RustDesk Touch".to_owned();
+    *config::APP_NAME.write().unwrap() = "IHPortals".to_owned();
 
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
