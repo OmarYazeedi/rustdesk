@@ -154,6 +154,12 @@ const String kOptionTabletMode = "tablet-mode";
 // the app is backgrounded. Defaults on -- that behaviour is the whole point of
 // this fork -- but it costs a persistent notification, so it can be turned off.
 const String kOptionKeepSessionAlive = "keep-session-alive";
+// The merged device list: which sources are shown, and how it's ranked. One key
+// per source rather than a packed string, so a source added later defaults to
+// visible instead of inheriting a stale blob.
+const String kOptionUnifiedShowPrefix = "unified-show-";
+const String kOptionUnifiedSort = "unified-sort";
+const String kOptionUnifiedList = "unified-list";
 // The floating keyboard button: whether it's loose on the canvas or pinned away
 // into the toolbar, and where the user last left it. Position is stored as a
 // fraction of the viewport so it survives a resize or a display change.

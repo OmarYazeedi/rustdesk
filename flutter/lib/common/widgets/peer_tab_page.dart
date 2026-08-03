@@ -24,6 +24,7 @@ import 'package:pull_down_button/pull_down_button.dart';
 
 import '../../common.dart';
 import '../../models/platform_model.dart';
+import 'unified_peers_view.dart';
 
 class PeerTabPage extends StatefulWidget {
   const PeerTabPage({Key? key}) : super(key: key);
@@ -43,6 +44,12 @@ EdgeInsets? _menuPadding() {
 
 class _PeerTabPageState extends State<PeerTabPage>
     with SingleTickerProviderStateMixin {
+  /// On by default. Kept switchable because the merged list replaces the whole
+  /// device-selection screen, and a way back to the tabs is cheap insurance
+  /// against it misbehaving on a machine I can't test on.
+  bool get _unifiedList =>
+      bind.mainGetLocalOption(key: kOptionUnifiedList) != 'N';
+
   final List<_TabEntry> entries = [
     _TabEntry(RecentPeersView(
       menuPadding: _menuPadding(),
@@ -118,9 +125,14 @@ class _PeerTabPageState extends State<PeerTabPage>
                 child: selectionWrap(Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // The tab switcher goes, but the row stays: search,
+                    // refresh and multi-select live here too and are still
+                    // wanted with one merged list.
                     Expanded(
-                        child: visibleContextMenuListener(
-                            _createSwitchBar(context))),
+                        child: _unifiedList
+                            ? const SizedBox.shrink()
+                            : visibleContextMenuListener(
+                                _createSwitchBar(context))),
                     if (stateGlobal.isPortrait.isTrue)
                       ..._portraitRightActions(context)
                     else
@@ -186,6 +198,15 @@ class _PeerTabPageState extends State<PeerTabPage>
   }
 
   Widget _createPeersView() {
+    // One merged list instead of five tabs. What a device is -- recent,
+    // favourite, both, discovered -- is now a mark on the row and a filter,
+    // rather than which tab you were standing in.
+    if (_unifiedList) {
+      return Expanded(
+          child: UnifiedPeersView(menuPadding: _menuPadding())
+              .marginSymmetric(
+                  vertical: (isDesktop || isWebDesktop) ? 12.0 : 6.0));
+    }
     final model = Provider.of<PeerTabModel>(context);
     Widget child;
     if (model.visibleEnabledOrderedIndexs.isEmpty) {
