@@ -1,5 +1,6 @@
 // main window right pane
 
+import 'package:flutter_hbb/common/widgets/portal_mark.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -317,6 +318,7 @@ class _ConnectionPageState extends State<ConnectionPage>
             SizedBox(height: 12),
             Divider().paddingOnly(right: 12),
             Expanded(child: PeerTabPage()),
+            const PortalMark(),
           ],
         ).paddingOnly(left: 12.0)),
         if (!isOutgoingOnly) const Divider(height: 1),

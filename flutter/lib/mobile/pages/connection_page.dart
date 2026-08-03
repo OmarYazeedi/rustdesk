@@ -1,3 +1,4 @@
+import 'package:flutter_hbb/common/widgets/portal_mark.dart';
 import 'dart:async';
 
 import 'package:auto_size_text_field/auto_size_text_field.dart';
@@ -90,7 +91,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ])),
         SliverFillRemaining(
           hasScrollBody: true,
-          child: PeerTabPage(),
+          child: Column(children: [
+            Expanded(child: PeerTabPage()),
+            const PortalMark(),
+          ]),
         )
       ],
     ).marginOnly(top: 2, left: 10, right: 10);
