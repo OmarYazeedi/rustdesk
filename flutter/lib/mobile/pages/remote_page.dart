@@ -116,7 +116,14 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     // the Rust runtime driving this connection included. That is what kills the
     // session on an app switch, a quick reply in another app, or an incoming
     // call. Hold a foreground service for as long as this page is alive.
-    if (isAndroid) {
+    // Read once, at session start. A mid-session change shouldn't yank the
+    // service out from under a live connection -- that's the failure this exists
+    // to prevent -- so it takes effect on the next session.
+    // `!= 'N'` rather than a bool option: unset must mean on. Keeping sessions
+    // alive is this fork's reason to exist, so it can't default off just because
+    // nobody has touched the setting yet.
+    if (isAndroid &&
+        bind.mainGetLocalOption(key: kOptionKeepSessionAlive) != 'N') {
       gFFI.invokeMethod(AndroidChannel.kStartSessionKeepAlive);
     }
     _physicalFocusNode.requestFocus();

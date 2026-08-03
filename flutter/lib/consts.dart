@@ -149,6 +149,11 @@ const String kOptionTouchMode = "touch-mode";
 // default -- a desktop with a touchscreen but a mouse in use should keep behaving
 // exactly as it does today.
 const String kOptionTabletMode = "tablet-mode";
+// Android only. Holds a foreground service for the life of an outgoing session,
+// so Android's freezer can't SIGSTOP the Rust runtime driving the connection when
+// the app is backgrounded. Defaults on -- that behaviour is the whole point of
+// this fork -- but it costs a persistent notification, so it can be turned off.
+const String kOptionKeepSessionAlive = "keep-session-alive";
 // The floating keyboard button: whether it's loose on the canvas or pinned away
 // into the toolbar, and where the user last left it. Position is stored as a
 // fraction of the viewport so it survives a resize or a display change.

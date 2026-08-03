@@ -1,0 +1,77 @@
+# Fork-only. Answers "has upstream moved, and will it merge?" once a week, so a
+# sync is a decision rather than a surprise.
+#
+# It never pushes anything. The merge is attempted in a throwaway branch purely to
+# see whether it conflicts, and the result goes to the run summary.
+#
+# Why bother: RustDesk is remote-access software. A fork that drifts months behind
+# upstream is carrying known security fixes it hasn't taken. The expensive part of
+# syncing isn't the merge, it's discovering mid-merge that upstream rewrote a file
+# we depend on -- this makes that discovery cheap and early.
+name: Upstream check
+
+on:
+  schedule:
+    # Mondays, 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/windows-tablet-touch
+          # Full history: a shallow clone has no merge base with upstream, so the
+          # merge below would be meaningless.
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/rustdesk/rustdesk.git
+          git fetch --quiet upstream master
+
+      - name: Report distance
+        id: distance
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/master)
+          AHEAD=$(git rev-list --count upstream/master..HEAD)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Upstream check"
+            echo
+            echo "- **$BEHIND** upstream commits not in this fork"
+            echo "- **$AHEAD** fork commits not upstream"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dry-run the merge
+        if: steps.distance.outputs.behind != '0'
+        run: |
+          git config user.name  "upstream-check"
+          git config user.email "upstream-check@local"
+          git checkout -q -b dry-run
+          if git merge --no-commit --no-ff upstream/master >/dev/null 2>&1; then
+            echo "- Merge is **clean**." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "- Merge **conflicts**:"
+            echo
+            echo '```'
+            git diff --name-only --diff-filter=U
+            echo '```'
+            echo
+            echo "See FORK.md for what we changed in each of these."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Conflicts are information, not a broken build -- upstream moving in the
+          # same files is expected. Failing here would train everyone to ignore it.
+          git merge --abort || true
+
+      - name: Note when already current
+        if: steps.distance.outputs.behind == '0'
+        run: echo "- Already up to date with upstream." >> "$GITHUB_STEP_SUMMARY"

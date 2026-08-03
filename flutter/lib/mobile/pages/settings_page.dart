@@ -83,6 +83,8 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
   var _enableRecordSession = false;
   var _enableHardwareCodec = false;
   var _allowWebSocket = false;
+  // Defaults on -- see kOptionKeepSessionAlive.
+  var _keepSessionAlive = true;
   var _autoRecordIncomingSession = false;
   var _autoRecordOutgoingSession = false;
   var _allowAutoDisconnect = false;
@@ -119,6 +121,8 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
     _enableHardwareCodec = option2bool(kOptionEnableHwcodec,
         bind.mainGetOptionSync(key: kOptionEnableHwcodec));
     _allowWebSocket = mainGetBoolOptionSync(kOptionAllowWebSocket);
+    _keepSessionAlive =
+        bind.mainGetLocalOption(key: kOptionKeepSessionAlive) != 'N';
     _allowInsecureTlsFallback =
         mainGetBoolOptionSync(kOptionAllowInsecureTLSFallback);
     _disableUdp = bind.mainGetOptionSync(key: kOptionDisableUdp) == 'Y';
@@ -761,6 +765,22 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                 onPressed: (context) {
                   changeSocks5Proxy();
                 }),
+          // Fork feature. Android freezes (SIGSTOPs) a backgrounded app with no
+          // foreground component, which kills the Rust runtime driving an
+          // outgoing session -- so this holds a foreground service for the life
+          // of the session. The cost is a persistent notification, hence a way
+          // to decline it. Takes effect on the next session.
+          if (isAndroid)
+            SettingsTile.switchTile(
+              title: Text(translate('Keep session alive in background')),
+              leading: Icon(Icons.play_circle_outline),
+              initialValue: _keepSessionAlive,
+              onToggle: (v) async {
+                await bind.mainSetLocalOption(
+                    key: kOptionKeepSessionAlive, value: v ? 'Y' : 'N');
+                setState(() => _keepSessionAlive = v);
+              },
+            ),
           if (isAndroid && !bind.isOutgoingOnly())
             SettingsTile(
                 title: Text(translate('Deploy')),
