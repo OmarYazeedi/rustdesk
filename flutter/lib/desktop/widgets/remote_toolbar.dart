@@ -998,11 +998,13 @@ class _TouchKeyboardToggle extends StatelessWidget {
     return Obx(() {
       if (!ffi.ffiModel.tabletMode) return const Offstage();
       final shown = ffi.ffiModel.windowsKeyboardShown.value ||
-          ffi.ffiModel.oskShown.value ||
-          ffi.ffiModel.softKeyboardVisible.value;
+          ffi.ffiModel.oskShown.value;
       return _IconMenuButton(
+        // Sized to buttonSize like the SVG icons beside it, which are rendered
+        // at the full button size. A hand-picked number here just made this one
+        // button look smaller than every other.
         icon: Icon(Icons.keyboard,
-            size: tabletModeGlobal.value ? 26 : 20, color: Colors.white),
+            size: _ToolbarTheme.buttonSize, color: Colors.white),
         tooltip: shown ? 'Hide keyboard' : 'Show keyboard',
         onPressed: () async {
           final raised = await toggleBestWindowsKeyboard();
@@ -1015,15 +1017,11 @@ class _TouchKeyboardToggle extends StatelessWidget {
               ffi.ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
               break;
             case RaisedKeyboard.none:
-              // Neither Windows keyboard would come up. Say why on screen rather
-              // than silently swapping in the in-app one and leaving the reason
-              // in a file nobody knows to look for.
+              // Nothing to fall back to now, so the reason has to be on screen.
               showToast(
-                  'Windows keyboard unavailable — using the in-app one.\n'
+                  'Keyboard unavailable.\n'
                   '${WindowsTouchKeyboard.lastDiagnostic}',
                   timeout: const Duration(seconds: 8));
-              ffi.ffiModel.softKeyboardVisible.value =
-                  !ffi.ffiModel.softKeyboardVisible.value;
               break;
           }
         },

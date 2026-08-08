@@ -70,14 +70,12 @@ class _FloatingKeyboardButtonState extends State<FloatingKeyboardButton> {
         ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
         break;
       case RaisedKeyboard.none:
-        // Neither Windows keyboard would come up; fall back to the in-app one so
-        // the button always does something, and say why on screen.
+        // Nothing to fall back to, so the reason goes on screen rather than
+        // leaving a button that appears to do nothing.
         showToast(
-            'Windows keyboard unavailable — using the in-app one.\n'
+            'Keyboard unavailable.\n'
             '${WindowsTouchKeyboard.lastDiagnostic}',
             timeout: const Duration(seconds: 8));
-        ffiModel.softKeyboardVisible.value =
-            !ffiModel.softKeyboardVisible.value;
         break;
     }
   }

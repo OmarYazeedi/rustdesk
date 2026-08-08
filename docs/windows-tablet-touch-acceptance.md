@@ -72,25 +72,22 @@ Known risk: with the texture render path the paint branch was changed to draw at
 the canvas offset. If zooming shows a clipped, stretched or misplaced image rather
 than a clean magnification, that's this — say what it looks like.
 
-## 6. Touch keyboard
+## 6. Keyboards
 
-Toolbar → **Touch keyboard**.
+Both are Windows' own. The in-app keyboard that used to back these up is gone,
+so if a toggle can't raise anything you get a toast naming the reason rather than
+a fallback.
 
-- [ ] It appears docked at the bottom and its taps type rather than clicking the
-      remote screen behind it.
-- [ ] Letters, digits and punctuation all arrive correctly. Check `` ` ``, `\`
-      and `.` specifically — those three go as literal characters rather than
-      `VK_*` names and are the most likely to misbehave.
-- [ ] Shift capitalises exactly one letter, then releases.
-- [ ] Ctrl latches: Ctrl then C copies, and Ctrl stays lit for a following V.
-- [ ] Arrows, Enter, Backspace, Tab, Esc.
-- [ ] **Fn** reveals F1–F12 and the Ins/Del/Home/End/PgUp/PgDn row.
-- [ ] **Win** opens the remote Start menu, *not* the Surface's own. This is the
-      whole reason the keyboard is drawn in-app rather than using Windows' —
-      if the local Start menu opens, something is falling through to the host.
+- [ ] The **keyboard button in the toolbar** raises a keyboard in one tap, and is
+      the same size as the buttons beside it.
+- [ ] The **floating button** does the same, and drags where you want it.
+- [ ] Toolbar → **Touch keyboard** raises the modern TabTip keyboard.
+- [ ] Toolbar → **On-screen keyboard** raises the accessibility OSK.
+- [ ] **Win** opens the remote Start menu, *not* the Surface's own. Keystrokes are
+      injected with SendInput, and RustDesk's low-level hook is what forwards them
+      to the peer — if the local Start menu opens, that hook isn't catching them.
 - [ ] Alt+Tab switches windows on the remote, not locally.
 - [ ] Ctrl+Alt+Del reaches the remote.
-- [ ] **Hide ⌄** dismisses it.
 
 ## 7. Ergonomics, for the follow-up list
 

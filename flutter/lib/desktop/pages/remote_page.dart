@@ -12,7 +12,6 @@ import '../../consts.dart';
 import '../../common/widgets/overlay.dart';
 import '../../common/widgets/remote_input.dart';
 import '../../common/widgets/floating_keyboard_button.dart';
-import '../../common/widgets/soft_keyboard.dart';
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/toolbar.dart';
@@ -995,23 +994,6 @@ class _RemotePageState extends State<RemotePage>
         return Offstage();
       }
       return Positioned.fill(child: FloatingKeyboardButton(ffi: _ffi));
-    }));
-    // The in-app touch keyboard, docked to the bottom. Deliberately outside the
-    // gesture region above so its taps are keys, not remote clicks.
-    paints.add(Obx(() {
-      if (!_ffi.ffiModel.tabletMode ||
-          _ffi.ffiModel.softKeyboardVisible.isFalse) {
-        return Offstage();
-      }
-      return Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: SoftKeyboard(
-          ffi: _ffi,
-          onClose: () => _ffi.ffiModel.softKeyboardVisible.value = false,
-        ),
-      );
     }));
     return Stack(
       children: paints,

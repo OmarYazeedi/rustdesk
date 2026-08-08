@@ -1239,9 +1239,6 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
         child: Text(translate('Mouse mode'))));
   }
 
-  // The in-app touch keyboard. Windows' own can't be raised from Flutter and
-  // would send reserved combinations to the local machine anyway -- see
-  // SoftKeyboard's header for why this is drawn in-app instead.
   if (isDesktop &&
       isDefaultConn &&
       !isWeb &&
@@ -1269,7 +1266,10 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
                     ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
                     return;
                   }
-                  ffiModel.softKeyboardVisible.value = true;
+                  showToast(
+                      'Keyboard unavailable.\n'
+                      '${WindowsTouchKeyboard.lastDiagnostic}',
+                      timeout: const Duration(seconds: 8));
                 }
               : null,
           child: Text(translate('Touch keyboard'))));
@@ -1280,7 +1280,10 @@ List<TToggleMenu> toolbarKeyboardToggles(FFI ffi) {
                   if (await WindowsTouchKeyboard.toggleOsk()) {
                     ffiModel.oskShown.value = WindowsTouchKeyboard.oskShown;
                   } else {
-                    ffiModel.softKeyboardVisible.value = true;
+                    showToast(
+                        'On-screen keyboard unavailable.\n'
+                        '${WindowsTouchKeyboard.lastDiagnostic}',
+                        timeout: const Duration(seconds: 8));
                   }
                 }
               : null,
