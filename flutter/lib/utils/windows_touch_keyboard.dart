@@ -93,7 +93,19 @@ class WindowsTouchKeyboard {
   /// user with no way to type.
   static Future<bool> toggleTouchKeyboard() async {
     if (!Platform.isWindows) return false;
-    if (_tryToggle()) return true;
+    // Prefer the real toggle when the COM class is there; it hides as well as
+    // shows, and leaves TabTip resident the way Windows expects.
+    if (_tryToggle()) {
+      _tabTipShown = false;
+      return true;
+    }
+    // Already up by our own hand, with no working toggle: end it to hide.
+    if (_tabTipShown) {
+      final r = Process.runSync('taskkill', const ['/IM', 'TabTip.exe', '/F']);
+      _tabTipShown = false;
+      _note('taskkill TabTip.exe -> exit ${r.exitCode}');
+      return true;
+    }
 
     // CoCreateInstance fails with REGDB_E_CLASSNOTREG until TabTip is running.
     // The first cut started TabTip and retried immediately, which cannot work --
@@ -118,9 +130,21 @@ class WindowsTouchKeyboard {
       await Future.delayed(const Duration(milliseconds: 250));
       if (_tryToggle()) return true;
     }
-    _note('TabTip started but Toggle never took after 2.5s');
-    return false;
+    // Toggle never took, but TabTip did start and the keyboard is on screen --
+    // reporting failure here was wrong, and produced a "keyboard unavailable"
+    // toast over a perfectly visible keyboard.
+    //
+    // UIHostNoLaunch simply isn't registered on some Windows 11 builds, so the
+    // COM route can't be relied on for hiding either. Fall back to running
+    // TabTip directly: ShellExecute to show, kill the process to hide.
+    _note('Toggle never took after 2.5s; TabTip is up, managing it directly');
+    _tabTipShown = true;
+    return true;
   }
+
+  /// True when we last raised TabTip ourselves and the COM toggle is unavailable,
+  /// so hiding has to be done by ending the process.
+  static bool _tabTipShown = false;
 
   /// Windows' accessibility On-Screen Keyboard (Settings > Accessibility >
   /// Keyboard). A plain floating window rather than the modern touch keyboard,
@@ -174,10 +198,11 @@ class WindowsTouchKeyboard {
         _note('taskkill osk.exe -> exit ${r.exitCode} ${r.stderr}'.trim());
         return true;
       }
-      // Awaited deliberately. `Process.start` returns a Future, so an unawaited
-      // call reports its failure as an unhandled async error that the try/catch
-      // here never sees -- which meant a launch that failed still set _oskShown
-      // and claimed success.
+      // ShellExecute, not Process.start. osk.exe is a uiAccess binary just like
+      // TabTip, so CreateProcess -- which is what Process.start uses -- fails it
+      // with ERROR_ELEVATION_REQUIRED. That was fixed for TabTip and missed
+      // here, which is why the diagnostic read
+      // "osk.exe failed: The requested operation requires elevation".
       //
       // System32 is spelled out rather than relying on PATH: on 64-bit Windows a
       // bare "osk.exe" is subject to WOW64 redirection, and osk.exe does not
@@ -188,10 +213,12 @@ class WindowsTouchKeyboard {
         _note('osk.exe not found at $osk');
         return false;
       }
-      final p = await Process.start(osk, const [],
-          mode: ProcessStartMode.detached);
+      if (!_shellExecute(osk)) {
+        _note('osk.exe would not start');
+        return false;
+      }
       _oskShown = true;
-      _note('osk.exe started, pid ${p.pid}');
+      _note('osk.exe started via ShellExecute');
       return true;
     } catch (e) {
       _note('osk.exe failed: $e');
