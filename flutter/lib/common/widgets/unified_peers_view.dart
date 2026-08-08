@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 
@@ -97,20 +98,37 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView> {
   @override
   void initState() {
     super.initState();
-    // Everything on by default: hiding a source is a deliberate act, and an
-    // empty-looking list on first run would just look broken.
-    _shown = PeerSource.values
-        .where((s) => bind.mainGetLocalOption(key: s.optionKey) != 'N')
-        .toSet();
+    // Everything on by default, and written out on first run rather than
+    // inferred from absent keys -- an empty-looking list on a fresh config is
+    // indistinguishable from a broken one.
+    _shown = {};
+    for (final s in PeerSource.values) {
+      final v = bind.mainGetLocalOption(key: s.optionKey);
+      if (v.isEmpty) {
+        bind.mainSetLocalOption(key: s.optionKey, value: 'Y');
+        _shown.add(s);
+      } else if (v != 'N') {
+        _shown.add(s);
+      }
+    }
     _sort = PeerSort.values.firstWhere(
       (s) => s.name == bind.mainGetLocalOption(key: kOptionUnifiedSort),
       orElse: () => PeerSort.priority,
     );
-    // The models only populate once something asks them to.
+    // The models only populate once something asks them to. The tabs each did
+    // this on the way in; with one list, all of it has to be asked for here --
+    // including the address book and group, which the tab entries pulled
+    // separately and which would otherwise stay permanently empty.
     bind.mainLoadRecentPeers();
     bind.mainLoadFavPeers();
     bind.mainLoadLanPeers();
     bind.mainDiscover();
+    try {
+      gFFI.abModel.pullAb(force: ForcePullAb.listAndCurrent, quiet: true);
+      gFFI.groupModel.pull(force: false);
+    } catch (_) {
+      // Not signed in, or no group. Neither is an error worth surfacing here.
+    }
   }
 
   List<_Entry> _merge() {
@@ -198,6 +216,10 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView> {
               avatar: Icon(s.icon, size: 16),
               label: Text(translate(s.label)),
               selected: on,
+              // Without this the selected state swaps the source icon for a
+              // tick, so a row of selected chips loses the very glyphs that say
+              // what each one is.
+              showCheckmark: false,
               onSelected: (_) => _toggleSource(s),
               visualDensity: VisualDensity.compact,
             ),
@@ -269,6 +291,10 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView> {
       animation: Listenable.merge(_models.values.toList()),
       builder: (context, _) {
         final entries = _merge();
+        // The multi-select bar and the toolbar actions read the current tab's
+        // cached peers. With the tabs gone, this list is what they should see.
+        gFFI.peerTabModel
+            .setCurrentTabCachedPeers(entries.map((e) => e.peer).toList());
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
