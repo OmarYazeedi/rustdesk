@@ -1,0 +1,37 @@
+# Fork-only. Builds just the Android client.
+#
+# Triggered by pushing a tag rather than by `workflow_dispatch`: a dispatch
+# workflow only gets its "Run workflow" button when the file is on the
+# repository's default branch, and this one is fork-only. Tag pushes carry no
+# such requirement and use the definition from the pushed ref.
+#
+#     git tag android-1 && git push fork android-1
+#
+# The APK lands in the run's artifacts. Bump the number for each build; the tag
+# name is only a trigger, nothing reads it.
+#
+# It passes `android-only`, which skips the ten desktop jobs -- macOS, iOS, both
+# Windows clients, Linux, appimage, flatpak and the publish step. Without that a
+# phone build drags the entire matrix along behind it.
+name: Android Build
+
+on:
+  push:
+    tags:
+      - "android-*"
+  workflow_dispatch:
+
+# One at a time, same reasoning as the Windows build: several runs publishing
+# from the same branch race each other otherwise.
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android-only:
+    uses: ./.github/workflows/flutter-build.yml
+    secrets: inherit
+    with:
+      upload-artifact: true
+      upload-tag: "android"
+      android-only: true

@@ -124,7 +124,7 @@ android {
         // Multiplied so each upstream version has room for its own run of BG
         // builds while staying monotonic when upstream bumps (67999 < 68000).
         versionCode flutterVersionCode.toInteger() * 1000 + bgBuild
-        versionName "${flutterVersionName}-bg.${bgBuild}+${bgCommit}"
+        versionName "${flutterVersionName}-ihp.${bgBuild}+${bgCommit}"
     }
 
     signingConfigs {
