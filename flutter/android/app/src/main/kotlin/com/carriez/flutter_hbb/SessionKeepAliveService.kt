@@ -36,6 +36,9 @@ import androidx.core.content.ContextCompat
 const val KEEP_ALIVE_NOTIFY_ID = 991001
 private const val KEEP_ALIVE_CHANNEL_ID = "RustDeskSession"
 
+/** Notification action: end the session without opening the app first. */
+const val ACTION_DISCONNECT = "com.ihportals.app.DISCONNECT_SESSION"
+
 class SessionKeepAliveService : Service() {
     companion object {
         private const val logTag = "mSessionKeepAlive"
@@ -86,6 +89,22 @@ class SessionKeepAliveService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_DISCONNECT) {
+            // The service holds the process alive but knows nothing about the
+            // connection -- that is owned on the Rust side -- so ask Flutter to
+            // end it. Best effort: if the channel has gone, stopping the service
+            // drops the process back into the freezer and the session goes with
+            // it, which is the same outcome by a blunter route.
+            try {
+                MainActivity.flutterMethodChannel?.invokeMethod(
+                    "close_outgoing_session", null
+                )
+            } catch (e: Exception) {
+                Log.e(logTag, "close_outgoing_session failed: $e")
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
         // The session this exists for is gone if the process dies, so there is
         // nothing to restore on restart.
         return START_NOT_STICKY
@@ -118,7 +137,8 @@ class SessionKeepAliveService : Service() {
         val channelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 KEEP_ALIVE_CHANNEL_ID,
-                "RustDesk Remote Session",
+                // Shown as the channel name in Android's notification settings.
+                "Remote session",
                 // Low keeps it silent and unobtrusive; it is a status row, not an alert.
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
@@ -145,15 +165,30 @@ class SessionKeepAliveService : Service() {
             PendingIntent.getActivity(this, 0, intent, FLAG_UPDATE_CURRENT)
         }
 
+        // Disconnect straight from the shade. Without it, ending a session that
+        // is running in the background means finding the app, opening it, and
+        // closing the session from inside -- three steps to undo one.
+        val disconnectIntent = Intent(this, SessionKeepAliveService::class.java)
+            .apply { action = ACTION_DISCONNECT }
+        val disconnectPending = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getService(
+                this, 1, disconnectIntent, FLAG_UPDATE_CURRENT or FLAG_IMMUTABLE
+            )
+        } else {
+            @Suppress("UnspecifiedImmutableFlag")
+            PendingIntent.getService(this, 1, disconnectIntent, FLAG_UPDATE_CURRENT)
+        }
+
         val notification = NotificationCompat.Builder(this, channelId)
             .setOngoing(true)
             .setSmallIcon(R.mipmap.ic_stat_logo)
-            .setContentTitle(DEFAULT_NOTIFY_TITLE)
-            .setContentText("Remote session active - tap to return")
+            .setContentTitle("Remote session running")
+            .setContentText("Tap to return to the session")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setContentIntent(pendingIntent)
+            .addAction(0, "Disconnect", disconnectPending)
             .setColor(ContextCompat.getColor(this, R.color.primary))
             .build()
 

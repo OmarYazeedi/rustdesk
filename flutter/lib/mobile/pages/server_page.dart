@@ -909,6 +909,15 @@ void androidChannelInit() {
             gFFI.serverModel.updateClientState();
             break;
           }
+        // The keep-alive notification's Disconnect action. Ending the session
+        // has to happen here rather than in the service: the service holds the
+        // process alive but knows nothing about the connection, which is owned
+        // on the Rust side.
+        case "close_outgoing_session":
+          {
+            closeConnection();
+            break;
+          }
         case "on_state_changed":
           {
             var name = arguments["name"] as String;

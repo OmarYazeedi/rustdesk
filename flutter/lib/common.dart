@@ -255,16 +255,21 @@ class MyTheme {
   MyTheme._();
 
   static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFF0071FF);
-  static const Color accent50 = Color(0x770071FF);
-  static const Color accent80 = Color(0xAA0071FF);
-  static const Color canvasColor = Color(0xFF212121);
+  // Amber on warm charcoal rather than upstream's blue on neutral grey. It reads
+  // as lantern light, which is the whole of the theming: nothing here is a
+  // reference to anything, it just sits in the same world as the name and the
+  // horse. Someone told what the app is called might notice; nobody else will.
+  static const Color accent = Color(0xFFE9A13B);
+  static const Color accent50 = Color(0x77E9A13B);
+  static const Color accent80 = Color(0xAAE9A13B);
+  // Warm, not neutral: 0xFF212121 next to amber looks like a mistake.
+  static const Color canvasColor = Color(0xFF2E2620);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF2C8CFF);
+  static const Color button = Color(0xFFF0B45C);
   static const Color hoverBorder = Color(0xFF999999);
 
   // ListTile
@@ -457,8 +462,10 @@ class MyTheme {
     menuBarTheme: MenuBarThemeData(
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
+    // A darker amber for light mode: the accent is tuned for dark surfaces and
+    // goes weak on white, and colorScheme.primary is what most widgets reach for.
     colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        primary: Color(0xFFB77A21), secondary: accent, background: grayBg),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
@@ -566,9 +573,10 @@ class MyTheme {
         style: MenuStyle(
             backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
     colorScheme: ColorScheme.dark(
-      primary: Colors.blue,
+      primary: accent,
       secondary: accent,
-      background: Color(0xFF24252B),
+      // Warmed from 0xFF24252B, which is a cold blue-grey and fights the amber.
+      background: Color(0xFF262220),
     ),
     popupMenuTheme: PopupMenuThemeData(
         shape: RoundedRectangleBorder(
