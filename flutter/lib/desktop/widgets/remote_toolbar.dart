@@ -997,8 +997,12 @@ class _TouchKeyboardToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       if (!ffi.ffiModel.tabletMode) return const Offstage();
-      final shown = ffi.ffiModel.windowsKeyboardShown.value ||
-          ffi.ffiModel.oskShown.value;
+      // Read from the windows themselves. The Rx flags only record what we last
+      // asked for, and go stale the moment a keyboard is closed by its own X.
+      ffi.ffiModel.windowsKeyboardShown.value;
+      ffi.ffiModel.oskShown.value;
+      final shown = WindowsTouchKeyboard.touchKeyboardVisible ||
+          WindowsTouchKeyboard.oskVisible;
       return _IconMenuButton(
         // Sized to buttonSize like the SVG icons beside it, which are rendered
         // at the full button size. A hand-picked number here just made this one

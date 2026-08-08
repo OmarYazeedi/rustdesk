@@ -95,17 +95,19 @@ class WindowsTouchKeyboard {
     if (!Platform.isWindows) return false;
     // Prefer the real toggle when the COM class is there; it hides as well as
     // shows, and leaves TabTip resident the way Windows expects.
-    if (_tryToggle()) {
-      _tabTipShown = false;
+    if (_tryToggle()) return true;
+
+    // No COM. Decide from what's actually on screen, not from what we last did,
+    // so closing the keyboard with its own X still leaves the next tap correct.
+    if (touchKeyboardVisible) {
+      _note('touch keyboard visible; ending TabTip to hide it');
+      _killTabTip();
       return true;
     }
-    // Already up by our own hand, with no working toggle: end it to hide.
-    if (_tabTipShown) {
-      final r = Process.runSync('taskkill', const ['/IM', 'TabTip.exe', '/F']);
-      _tabTipShown = false;
-      _note('taskkill TabTip.exe -> exit ${r.exitCode}');
-      return true;
-    }
+    // A resident-but-hidden TabTip ignores being launched again -- that is the
+    // Windows 11 behaviour this whole path exists to work around. Clearing it
+    // first means the launch below always produces a visible keyboard.
+    _killTabTip();
 
     // CoCreateInstance fails with REGDB_E_CLASSNOTREG until TabTip is running.
     // The first cut started TabTip and retried immediately, which cannot work --
@@ -138,13 +140,8 @@ class WindowsTouchKeyboard {
     // COM route can't be relied on for hiding either. Fall back to running
     // TabTip directly: ShellExecute to show, kill the process to hide.
     _note('Toggle never took after 2.5s; TabTip is up, managing it directly');
-    _tabTipShown = true;
     return true;
   }
-
-  /// True when we last raised TabTip ourselves and the COM toggle is unavailable,
-  /// so hiding has to be done by ending the process.
-  static bool _tabTipShown = false;
 
   /// Windows' accessibility On-Screen Keyboard (Settings > Accessibility >
   /// Keyboard). A plain floating window rather than the modern touch keyboard,
@@ -153,6 +150,48 @@ class WindowsTouchKeyboard {
   static bool _oskShown = false;
 
   static bool get oskShown => _oskShown;
+
+  /// Is a window of this class on screen right now?
+  ///
+  /// Tracking what we last did doesn't survive the user closing a keyboard with
+  /// its own X button: the flag says "shown", the next tap tries to hide
+  /// something already gone, and nothing appears to happen. So ask Windows
+  /// instead of remembering.
+  ///
+  /// Process presence is not a usable proxy for TabTip -- on Windows 11 it stays
+  /// resident with the keyboard hidden -- so this tests the window itself.
+  static bool _classVisible(String className) {
+    final arena = Arena();
+    try {
+      final user32 = DynamicLibrary.open('user32.dll');
+      final findWindow = user32.lookupFunction<
+          IntPtr Function(Pointer<Utf16>, Pointer<Utf16>),
+          int Function(Pointer<Utf16>, Pointer<Utf16>)>('FindWindowW');
+      final isVisible = user32
+          .lookupFunction<Int32 Function(IntPtr), int Function(int)>(
+              'IsWindowVisible');
+      final hwnd =
+          findWindow(className.toNativeUtf16(allocator: arena), nullptr);
+      if (hwnd == 0) return false;
+      return isVisible(hwnd) != 0;
+    } catch (e) {
+      _note('window check failed for $className: $e');
+      return false;
+    } finally {
+      arena.releaseAll();
+    }
+  }
+
+  /// The touch keyboard's window class.
+  static bool get touchKeyboardVisible => _classVisible('IPTip_Main_Window');
+
+  /// The accessibility On-Screen Keyboard's window class.
+  static bool get oskVisible => _classVisible('OSKMainClass');
+
+  static bool _killTabTip() {
+    final r = Process.runSync('taskkill', const ['/IM', 'TabTip.exe', '/F']);
+    return r.exitCode == 0;
+  }
 
   /// Launch via `ShellExecuteW` rather than `Process.start`.
   ///
@@ -192,7 +231,9 @@ class WindowsTouchKeyboard {
   static Future<bool> toggleOsk() async {
     if (!Platform.isWindows) return false;
     try {
-      if (_oskShown) {
+      // Same reasoning as the touch keyboard: ask whether it's on screen rather
+      // than trusting a flag the user can invalidate by closing it themselves.
+      if (oskVisible) {
         final r = Process.runSync('taskkill', const ['/IM', 'osk.exe', '/F']);
         _oskShown = false;
         _note('taskkill osk.exe -> exit ${r.exitCode} ${r.stderr}'.trim());
