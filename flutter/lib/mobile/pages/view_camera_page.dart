@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -202,15 +202,20 @@ class _ViewCameraPageState extends State<ViewCameraPage>
               : null,
           floatingActionButton: !showActionButton
               ? null
+              // Matches the remote page: outlined, not a filled amber disc.
               : FloatingActionButton(
                   mini: !keyboardIsVisible,
+                  elevation: 2,
+                  shape: CircleBorder(
+                    side: BorderSide(color: MyTheme.accent, width: 1.5),
+                  ),
                   child: Icon(
                     (keyboardIsVisible || _showGestureHelp)
                         ? Icons.expand_more
                         : Icons.expand_less,
-                    color: Colors.white,
+                    color: MyTheme.accent,
                   ),
-                  backgroundColor: MyTheme.accent,
+                  backgroundColor: MyTheme.barDark,
                   onPressed: () {
                     setState(() {
                       if (keyboardIsVisible) {
@@ -292,24 +297,28 @@ class _ViewCameraPageState extends State<ViewCameraPage>
   }
 
   Widget getBottomAppBar() {
-    return BottomAppBar(
-      elevation: 10,
-      color: MyTheme.accent,
-      child: Row(
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: MyTheme.accent, width: 1.5)),
+      ),
+      child: BottomAppBar(
+        elevation: 0,
+        color: MyTheme.barDark,
+        child: Row(
         mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           Row(
               children: <Widget>[
                     IconButton(
-                      color: Colors.white,
+                      color: MyTheme.accent,
                       icon: Icon(Icons.clear),
                       onPressed: () {
                         clientClose(sessionId, gFFI);
                       },
                     ),
                     IconButton(
-                      color: Colors.white,
+                      color: MyTheme.accent,
                       icon: Icon(Icons.tv),
                       onPressed: () {
                         setState(() => _showEdit = false);
@@ -324,7 +333,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
                               future: gFFI.invokeMethod(
                                   "get_value", "KEY_IS_SUPPORT_VOICE_CALL"),
                               hasData: (isSupportVoiceCall) => IconButton(
-                                    color: Colors.white,
+                                    color: MyTheme.accent,
                                     icon: isAndroid && isSupportVoiceCall
                                         ? SvgPicture.asset('assets/chat.svg',
                                             colorFilter: ColorFilter.mode(
@@ -338,7 +347,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
                         ]) +
                   [
                     IconButton(
-                      color: Colors.white,
+                      color: MyTheme.accent,
                       icon: Icon(Icons.more_vert),
                       onPressed: () {
                         setState(() => _showEdit = false);
@@ -347,7 +356,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
                     ),
                   ]),
           Obx(() => IconButton(
-                color: Colors.white,
+                color: MyTheme.accent,
                 icon: Icon(Icons.expand_more),
                 onPressed: gFFI.ffiModel.waitForFirstImage.isTrue
                     ? null
@@ -355,7 +364,8 @@ class _ViewCameraPageState extends State<ViewCameraPage>
                         setState(() => _showBar = !_showBar);
                       },
               )),
-        ],
+          ],
+        ),
       ),
     );
   }

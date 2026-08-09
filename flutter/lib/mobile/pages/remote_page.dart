@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -411,10 +411,10 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                 content == '[]' ||
                 content == '<>' ||
                 content == "{}" ||
-                content == '”“' ||
-                content == '《》' ||
-                content == '（）' ||
-                content == '【】')) {
+                content == 'â€â€œ' ||
+                content == 'ã€Šã€‹' ||
+                content == 'ï¼ˆï¼‰' ||
+                content == 'ã€ã€‘')) {
           // can not only input content[0], because when input ], [ are also auo insert, which cause ] never be input
           bind.sessionInputString(sessionId: sessionId, value: content);
           _openKeyboardUnlocked();
@@ -518,15 +518,22 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
               : null,
           floatingActionButton: !showActionButton
               ? null
+              // Outlined rather than filled: a solid amber disc floating over
+              // the remote screen is the brightest thing on it, which is the
+              // wrong thing to draw the eye.
               : FloatingActionButton(
                   mini: !keyboardIsVisible,
+                  elevation: 2,
+                  shape: CircleBorder(
+                    side: BorderSide(color: MyTheme.accent, width: 1.5),
+                  ),
                   child: Icon(
                     (keyboardIsVisible || _showGestureHelp)
                         ? Icons.expand_more
                         : Icons.expand_less,
-                    color: Colors.white,
+                    color: MyTheme.accent,
                   ),
-                  backgroundColor: MyTheme.accent,
+                  backgroundColor: MyTheme.barDark,
                   onPressed: () {
                     setState(() {
                       if (keyboardIsVisible) {
@@ -613,24 +620,31 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
 
   Widget getBottomAppBar() {
     final ffiModel = Provider.of<FfiModel>(context);
-    return BottomAppBar(
-      elevation: 10,
-      color: MyTheme.accent,
-      child: Row(
+    // Dark bar with amber icons, and a single amber hairline along the top edge
+    // to separate it from the remote screen -- the separation the solid amber
+    // fill used to provide, without the fill.
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: MyTheme.accent, width: 1.5)),
+      ),
+      child: BottomAppBar(
+        elevation: 0,
+        color: MyTheme.barDark,
+        child: Row(
         mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           Row(
               children: <Widget>[
                     IconButton(
-                      color: Colors.white,
+                      color: MyTheme.accent,
                       icon: Icon(Icons.clear),
                       onPressed: () {
                         clientClose(sessionId, gFFI);
                       },
                     ),
                     IconButton(
-                      color: Colors.white,
+                      color: MyTheme.accent,
                       icon: Icon(Icons.tv),
                       onPressed: () {
                         setState(() => _showEdit = false);
@@ -643,11 +657,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                       : gFFI.ffiModel.isPeerAndroid
                           ? [
                               IconButton(
-                                  color: Colors.white,
+                                  color: MyTheme.accent,
                                   icon: Icon(Icons.keyboard),
                                   onPressed: openKeyboard),
                               IconButton(
-                                color: Colors.white,
+                                color: MyTheme.accent,
                                 icon: const Icon(Icons.build),
                                 onPressed: () => gFFI.dialogManager
                                     .toggleMobileActionsOverlay(ffi: gFFI),
@@ -655,11 +669,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                             ]
                           : [
                               IconButton(
-                                  color: Colors.white,
+                                  color: MyTheme.accent,
                                   icon: Icon(Icons.keyboard),
                                   onPressed: openKeyboard),
                               IconButton(
-                                color: Colors.white,
+                                color: MyTheme.accent,
                                 icon: Icon(gFFI.ffiModel.touchMode
                                     ? Icons.touch_app
                                     : Icons.mouse),
@@ -674,7 +688,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                               future: gFFI.invokeMethod(
                                   "get_value", "KEY_IS_SUPPORT_VOICE_CALL"),
                               hasData: (isSupportVoiceCall) => IconButton(
-                                    color: Colors.white,
+                                    color: MyTheme.accent,
                                     icon: isAndroid && isSupportVoiceCall
                                         ? SvgPicture.asset('assets/chat.svg',
                                             colorFilter: ColorFilter.mode(
@@ -688,7 +702,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                         ]) +
                   [
                     IconButton(
-                      color: Colors.white,
+                      color: MyTheme.accent,
                       icon: Icon(Icons.more_vert),
                       onPressed: () {
                         setState(() => _showEdit = false);
@@ -697,15 +711,16 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                     ),
                   ]),
           Obx(() => IconButton(
-                color: Colors.white,
+                color: MyTheme.accent,
                 icon: Icon(Icons.expand_more),
                 onPressed: gFFI.ffiModel.waitForFirstImage.isTrue
                     ? null
                     : () {
                         setState(() => _showBar = !_showBar);
                       },
-              )),
-        ],
+                )),
+          ],
+        ),
       ),
     );
   }
