@@ -124,7 +124,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     // nobody has touched the setting yet.
     if (isAndroid &&
         bind.mainGetLocalOption(key: kOptionKeepSessionAlive) != 'N') {
-      gFFI.invokeMethod(AndroidChannel.kStartSessionKeepAlive);
+      _startSessionKeepAlive();
     }
     _physicalFocusNode.requestFocus();
     gFFI.inputModel.listenToMouse(true);
@@ -158,6 +158,25 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     if (gFFI.ffiModel.pi.isSet.value) {
       _initWaylandKeyboardGateIfNeeded();
     }
+  }
+
+  /// Ask for notification permission before starting the keep-alive service.
+  ///
+  /// Android 13 and up will not display a foreground service's notification
+  /// without POST_NOTIFICATIONS, and the app only ever requested it when
+  /// starting the *incoming* sharing service. Someone who only ever controls
+  /// other machines never granted it, so the session notification -- the one
+  /// offering a way back or a disconnect -- silently never appeared.
+  ///
+  /// The service starts regardless of the answer: keeping the session alive is
+  /// the point, and the notification is how it's surfaced, not why it exists.
+  Future<void> _startSessionKeepAlive() async {
+    try {
+      await gFFI.serverModel.checkRequestNotificationPermission();
+    } catch (e) {
+      debugPrint('notification permission request failed: $e');
+    }
+    gFFI.invokeMethod(AndroidChannel.kStartSessionKeepAlive);
   }
 
   @override
