@@ -264,6 +264,12 @@ class MyTheme {
   static const Color accent80 = Color(0xAAE9A13B);
   // Warm, not neutral: 0xFF212121 next to amber looks like a mistake.
   static const Color canvasColor = Color(0xFF2E2620);
+  // The app bar. Near-black so the amber icons on it are the only thing that
+  // carries colour -- an amber-filled bar is a lot of saturation to look at.
+  static const Color barDark = Color(0xFF15120F);
+  // The surface behind everything, a step lighter than the bar so the two read
+  // as separate planes rather than one flat field.
+  static const Color bgDark = Color(0xFF1B1714);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
@@ -387,8 +393,16 @@ class MyTheme {
     hoverColor: Color.fromARGB(255, 224, 224, 224),
     scaffoldBackgroundColor: Colors.white,
     dialogBackgroundColor: Colors.white,
+    // Explicit, because Material 3 fills an unstyled app bar from
+    // colorScheme.primary -- which is the accent, and gave a solid mustard bar.
+    // The amber belongs on the icons, not behind them.
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
+      backgroundColor: MyTheme.barDark,
+      foregroundColor: MyTheme.accent,
+      surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: MyTheme.accent),
+      actionsIconTheme: IconThemeData(color: MyTheme.accent),
     ),
     dialogTheme: DialogTheme(
       elevation: 15,
@@ -485,10 +499,17 @@ class MyTheme {
     useMaterial3: false,
     brightness: Brightness.dark,
     hoverColor: Color.fromARGB(255, 45, 46, 53),
-    scaffoldBackgroundColor: Color(0xFF18191E),
-    dialogBackgroundColor: Color(0xFF18191E),
+    // Considerably darker than upstream's 0xFF18191E, and warm rather than
+    // blue-grey so it sits under the amber instead of fighting it.
+    scaffoldBackgroundColor: MyTheme.bgDark,
+    dialogBackgroundColor: MyTheme.bgDark,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
+      backgroundColor: MyTheme.barDark,
+      foregroundColor: MyTheme.accent,
+      surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: MyTheme.accent),
+      actionsIconTheme: IconThemeData(color: MyTheme.accent),
     ),
     dialogTheme: DialogTheme(
       elevation: 15,
@@ -575,8 +596,7 @@ class MyTheme {
     colorScheme: ColorScheme.dark(
       primary: accent,
       secondary: accent,
-      // Warmed from 0xFF24252B, which is a cold blue-grey and fights the amber.
-      background: Color(0xFF262220),
+      background: bgDark,
     ),
     popupMenuTheme: PopupMenuThemeData(
         shape: RoundedRectangleBorder(
@@ -638,8 +658,14 @@ class MyTheme {
         return ThemeMode.light;
       case "dark":
         return ThemeMode.dark;
-      default:
+      case "system":
         return ThemeMode.system;
+      default:
+        // Dark when nothing has been chosen, rather than following the system.
+        // The whole look is amber on near-black; the light theme is a pale
+        // version of it, and a phone in light mode would otherwise never see
+        // the theme the app was designed around. Still overridable in settings.
+        return ThemeMode.dark;
     }
   }
 }
