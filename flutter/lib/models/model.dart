@@ -2332,6 +2332,13 @@ class CanvasModel with ChangeNotifier {
   Size get size => _size;
   ScrollStyle get scrollStyle => _scrollStyle;
   ViewStyle get viewStyle => _lastViewStyle;
+
+  /// Zoomed in past the fit scale, so there is somewhere to pan to.
+  ///
+  /// At fit the whole remote screen is already on show and panning does
+  /// nothing, which is what lets a two-finger drag mean "scroll the remote"
+  /// there without taking anything away.
+  bool get isZoomedIn => _scale > _lastViewStyle.scale * 1.02;
   RxBool get imageOverflow => _imageOverflow;
 
   _resetScroll() => setScrollPercent(0.0, 0.0);

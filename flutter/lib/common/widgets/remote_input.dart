@@ -91,6 +91,10 @@ class _RawTouchGestureDetectorRegionState
   // Timestamp of the last long press event.
   int _cacheLongPressPositionTs = 0;
   double _mouseScrollIntegral = 0; // mouse scroll speed controller
+  // Accumulator for two-finger scroll, matching how the three-finger one works:
+  // wheel events are discrete, so fractional finger movement is banked until it
+  // adds up to a click rather than being rounded away each frame.
+  double _twoFingerScrollIntegral = 0;
   double _scale = 1;
 
   // Workaround tap down event when two fingers are used to scale(mobile)
@@ -495,6 +499,30 @@ class _RawTouchGestureDetectorRegionState
       }
     } else {
       // Mobile, and desktop in tablet mode.
+      //
+      // Windows handles three- and four-finger touchscreen gestures in the
+      // shell before any app sees them, so RustDesk's three-finger scroll never
+      // arrives -- a swipe down minimises instead. Two fingers are the trackpad
+      // gesture for scrolling anyway, so they do it here when there's nothing
+      // else useful for them to do.
+      //
+      // Pinching always zooms. Failing that: pan if zoomed in, scroll if not,
+      // since at fit the whole screen is already visible and panning is a no-op.
+      final pinching = (d.scale - _scale).abs() > 0.01;
+      if (!pinching &&
+          ffiModel.tabletMode &&
+          !ffi.canvasModel.isZoomedIn &&
+          !ffiModel.isPeerAndroid) {
+        _twoFingerScrollIntegral += d.focalPointDelta.dy / 4;
+        if (_twoFingerScrollIntegral > 1) {
+          inputModel.scroll(1);
+          _twoFingerScrollIntegral = 0;
+        } else if (_twoFingerScrollIntegral < -1) {
+          inputModel.scroll(-1);
+          _twoFingerScrollIntegral = 0;
+        }
+        return;
+      }
       ffi.canvasModel.updateScale(d.scale / _scale, d.focalPoint);
       _scale = d.scale;
       ffi.canvasModel.panX(d.focalPointDelta.dx);
