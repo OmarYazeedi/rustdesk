@@ -23,7 +23,9 @@ import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.PendingIntent.FLAG_UPDATE_CURRENT
 import android.app.Service
 import android.content.Context
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -203,22 +205,36 @@ class SessionKeepAliveService : Service() {
                 "rustdesk:session_keep_alive"
             ).apply {
                 setReferenceCounted(false)
-                // Released in onDestroy; the service's lifetime is the session's.
-                acquire()
             }
+            // Deliberately not acquired here. A partial wake lock only stops the
+            // CPU suspending, and the CPU does not suspend while the screen is
+            // on -- so holding one through a session you are actively watching
+            // buys nothing and blocks every idle moment from being cheap. It is
+            // taken when the screen goes off and dropped when it comes back, via
+            // the receiver below.
+            registerReceiver(screenReceiver, IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            })
+            screenReceiverRegistered = true
+            // If the screen is already off when the session starts, there is no
+            // broadcast coming to tell us so.
+            if (!powerManager.isInteractive) acquireWakeLock()
         } catch (e: Exception) {
-            Log.e(logTag, "Failed to acquire wake lock", e)
+            Log.e(logTag, "Failed to set up wake lock", e)
         }
 
         try {
             val wifiManager =
                 applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                WifiManager.WIFI_MODE_FULL_LOW_LATENCY
-            } else {
-                @Suppress("DEPRECATION")
-                WifiManager.WIFI_MODE_FULL_HIGH_PERF
-            }
+            // WIFI_MODE_FULL, not FULL_LOW_LATENCY. Low latency mode disables
+            // wifi power save outright -- Google documents it as substantially
+            // increasing power draw, and it is meant for real-time gaming. It
+            // keeps a few milliseconds off round trips at a cost measured in
+            // percent of battery per hour, which is the wrong trade for a
+            // session that is mostly idle or in the background.
+            @Suppress("DEPRECATION")
+            val mode = WifiManager.WIFI_MODE_FULL
             wifiLock = wifiManager.createWifiLock(mode, "rustdesk:session_keep_alive").apply {
                 setReferenceCounted(false)
                 acquire()
@@ -228,7 +244,45 @@ class SessionKeepAliveService : Service() {
         }
     }
 
+    private fun acquireWakeLock() {
+        try {
+            wakeLock?.let { if (!it.isHeld) it.acquire() }
+        } catch (e: Exception) {
+            Log.e(logTag, "acquire wake lock failed", e)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (e: Exception) {
+            Log.e(logTag, "release wake lock failed", e)
+        }
+    }
+
+    private var screenReceiverRegistered = false
+
+    /** Screen off: hold the CPU awake. Screen on: the system already is. */
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> acquireWakeLock()
+                Intent.ACTION_SCREEN_ON -> releaseWakeLock()
+            }
+        }
+    }
+
     private fun releaseLocks() {
+        // Before the locks, so a failure below can't leave the receiver
+        // registered against a destroyed service.
+        if (screenReceiverRegistered) {
+            try {
+                unregisterReceiver(screenReceiver)
+            } catch (e: Exception) {
+                Log.e(logTag, "unregister screen receiver failed", e)
+            }
+            screenReceiverRegistered = false
+        }
         try {
             wakeLock?.let { if (it.isHeld) it.release() }
         } catch (e: Exception) {

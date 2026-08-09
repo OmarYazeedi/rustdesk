@@ -232,9 +232,15 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       trySyncClipboard();
       _restoreVideoForForeground();
+      WakelockManager.enable(_uniqueKey);
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _throttleVideoForBackground();
+      // Drop the screen wakelock while off-screen. It is held for the whole
+      // session so the display doesn't time out mid-use, but backgrounded there
+      // is nothing to keep lit -- and the display is the single largest draw on
+      // the battery, well ahead of anything the connection itself costs.
+      WakelockManager.disable(_uniqueKey);
     }
   }
 

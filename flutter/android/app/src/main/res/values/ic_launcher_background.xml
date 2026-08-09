@@ -2,5 +2,5 @@
 <resources>
     <!-- Dark warm charcoal behind the outline horse: the icon pack this is meant to
          sit beside is outline art, and amber fought with it. -->
-    <color name="ic_launcher_background">#2E2620</color>
+    <color name="ic_launcher_background">#00000000</color>
 </resources>
