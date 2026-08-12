@@ -938,14 +938,70 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
     }
 }
 
+/// Where this fork publishes its builds. The updater reads BUILD -- a flat file
+/// holding the commit sha the release was built from -- and compares it with
+/// this client's own `FORK_BUILD`.
+///
+/// A plain file rather than the GitHub API: no rate limit, no auth, no JSON.
+pub const FORK_RELEASE_BASE: &str =
+    "https://github.com/OmarYazeedi/rustdesk/releases/download/windows-touch";
+
 pub fn check_software_update() {
-    if is_custom_client() {
+    // Upstream skips the check entirely for a renamed client, because its
+    // endpoint only knows about official RustDesk releases and would offer to
+    // replace this build with one. This fork checks its own releases instead,
+    // so the rename is no longer a reason to skip it -- but a build with no
+    // stamp still is: it came from outside CI and there is nothing to compare.
+    if FORK_BUILD == "dev" {
         return;
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
     if config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &opt) {
-        std::thread::spawn(move || allow_err!(do_check_software_update()));
+        std::thread::spawn(move || allow_err!(do_check_fork_update()));
     }
+}
+
+/// Fetch the published build stamp and, if it differs from ours, expose the
+/// download so the UI can offer it.
+#[tokio::main(flavor = "current_thread")]
+pub async fn do_check_fork_update() -> hbb_common::ResultType<()> {
+    let url = format!("{}/BUILD", FORK_RELEASE_BASE);
+    let client = create_http_client_async(TlsType::Rustls, false);
+    let published = client
+        .get(&url)
+        .send()
+        .await?
+        .text()
+        .await?
+        .trim()
+        .to_owned();
+
+    // Any difference means "not the build we published", not "older". Releases
+    // only ever move forward here, and comparing shas keeps this out of the
+    // business of parsing versions -- which it would get wrong, since every
+    // build reports 1.4.9.
+    if published.is_empty() || published == FORK_BUILD {
+        *SOFTWARE_UPDATE_URL.lock().unwrap() = "".to_string();
+        return Ok(());
+    }
+
+    let download = if cfg!(target_os = "windows") {
+        format!("{}/rustdesk-{}-x86_64.exe", FORK_RELEASE_BASE, crate::VERSION)
+    } else {
+        FORK_RELEASE_BASE.to_owned()
+    };
+    log::info!("fork update available: {} -> {}", FORK_BUILD, published);
+    #[cfg(feature = "flutter")]
+    {
+        let mut m = HashMap::new();
+        m.insert("name", "check_software_update_finish");
+        m.insert("url", &download);
+        if let Ok(data) = serde_json::to_string(&m) {
+            let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+        }
+    }
+    *SOFTWARE_UPDATE_URL.lock().unwrap() = download;
+    Ok(())
 }
 
 // No need to check `danger_accept_invalid_cert` for now.

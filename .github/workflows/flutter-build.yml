@@ -384,6 +384,19 @@ jobs:
         run: |
           BASE_URL=${{ env.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./SignOutput
 
+      # What the in-app updater reads to decide whether a newer build exists.
+      # A flat text file rather than the GitHub API: no rate limit, no JSON to
+      # parse, and no auth. It holds the same sha this build was stamped with,
+      # so the client compares its own FORK_BUILD against it.
+      # Written by every arch rather than just one: the path is literal, not a
+      # glob, so a job that skipped it would hand the release step a file that
+      # isn't there. Both arches are the same commit, so last write wins with
+      # identical content.
+      - name: Write build stamp
+        if: env.UPLOAD_ARTIFACT == 'true'
+        shell: bash
+        run: echo -n "${{ github.sha }}" > ./SignOutput/BUILD
+
       - name: Publish Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -393,6 +406,7 @@ jobs:
           files: |
             ./SignOutput/rustdesk-*.msi
             ./SignOutput/rustdesk-*.exe
+            ./SignOutput/BUILD
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
   build-for-windows-sciter:
