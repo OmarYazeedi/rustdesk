@@ -1,13 +1,15 @@
-# Fork-only. Answers "has upstream moved, and will it merge?" once a week, so a
-# sync is a decision rather than a surprise.
+# Fork-only. Weekly: has upstream moved, will it merge, and if so prepare it.
 #
-# It never pushes anything. The merge is attempted in a throwaway branch purely to
-# see whether it conflicts, and the result goes to the run summary.
+# Deliberately stops short of shipping. It merges into a throwaway branch and
+# opens a pull request; it never pushes to feat/windows-tablet-touch. This is
+# remote-access software, and an auto-merged build that nobody looked at is how
+# you ship something broken or insecure to your own machines. The tedious part
+# -- noticing upstream moved, doing the merge, finding the conflicts -- is
+# automated. The decision is not.
 #
-# Why bother: RustDesk is remote-access software. A fork that drifts months behind
-# upstream is carrying known security fixes it hasn't taken. The expensive part of
-# syncing isn't the merge, it's discovering mid-merge that upstream rewrote a file
-# we depend on -- this makes that discovery cheap and early.
+# On conflict it reports the files and stops, which is information rather than a
+# failure: upstream touching the same files is expected, and a job that goes red
+# every week is a job everyone learns to ignore.
 name: Upstream check
 
 on:
@@ -17,7 +19,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   check:
@@ -27,8 +30,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: feat/windows-tablet-touch
-          # Full history: a shallow clone has no merge base with upstream, so the
-          # merge below would be meaningless.
+          # Full history: a shallow clone has no merge base with upstream, so
+          # the merge below would be meaningless.
           fetch-depth: 0
 
       - name: Fetch upstream
@@ -49,28 +52,55 @@ jobs:
             echo "- **$AHEAD** fork commits not upstream"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Dry-run the merge
+      - name: Merge, and open a PR if it is clean
         if: steps.distance.outputs.behind != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name  "upstream-check"
-          git config user.email "upstream-check@local"
-          git checkout -q -b dry-run
-          if git merge --no-commit --no-ff upstream/master >/dev/null 2>&1; then
-            echo "- Merge is **clean**." >> "$GITHUB_STEP_SUMMARY"
+          git config user.email "upstream-check@users.noreply.github.com"
+          BRANCH="sync/upstream-$(date -u +%Y%m%d)"
+          git checkout -q -b "$BRANCH"
+
+          if ! git merge --no-edit upstream/master >/dev/null 2>&1; then
+            {
+              echo "- Merge **conflicts**, stopping here:"
+              echo
+              echo '```'
+              git diff --name-only --diff-filter=U
+              echo '```'
+              echo
+              echo "FORK.md lists what we changed in each of these."
+            } >> "$GITHUB_STEP_SUMMARY"
+            git merge --abort || true
             exit 0
           fi
-          {
-            echo "- Merge **conflicts**:"
-            echo
-            echo '```'
-            git diff --name-only --diff-filter=U
-            echo '```'
-            echo
-            echo "See FORK.md for what we changed in each of these."
-          } >> "$GITHUB_STEP_SUMMARY"
-          # Conflicts are information, not a broken build -- upstream moving in the
-          # same files is expected. Failing here would train everyone to ignore it.
-          git merge --abort || true
+
+          # Nothing to do if a previous run already prepared this exact tree.
+          if git diff --quiet "origin/$BRANCH" 2>/dev/null; then
+            echo "- Already prepared." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git push -f origin "$BRANCH"
+          EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            echo "- Merge is clean; refreshed PR #$EXISTING." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh pr create \
+            --base feat/windows-tablet-touch \
+            --head "$BRANCH" \
+            --title "Sync upstream ($(date -u +%Y-%m-%d))" \
+            --body "$(printf '%s\n' \
+              'Automated upstream merge. It applied cleanly; nothing has been verified beyond that.' \
+              '' \
+              'Before merging:' \
+              '- `flutter analyze --no-pub` should still report **19 errors**. More than that came from this merge.' \
+              '- Build and re-run `docs/windows-tablet-touch-acceptance.md`.' \
+              '' \
+              'FORK.md lists the files where upstream and this fork both make changes.')"
+          echo "- Merge is clean; opened a PR." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Note when already current
         if: steps.distance.outputs.behind == '0'
