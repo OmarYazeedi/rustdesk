@@ -40,7 +40,15 @@ const BR_MIN_HIGH_RESOLUTION: f32 = 0.1; // For high resolution, BR_MIN is still
 const MAX_BR_MULTIPLE: f32 = 1.0;
 
 const HISTORY_DELAY_LEN: usize = 2;
-const ADJUST_RATIO_INTERVAL: usize = 3; // Adjust quality ratio every 3 seconds
+// Upstream waits 3 seconds between quality adjustments, so recovering from a
+// drop takes several of them and a still screen stays soft for far longer than
+// the network needs it to. Every second still leaves HISTORY_DELAY_LEN samples
+// of delay history behind each decision, so it reacts sooner without reacting to
+// noise.
+//
+// Note this is the *controlled* side: it only takes effect when the machine
+// being viewed is running this build.
+const ADJUST_RATIO_INTERVAL: usize = 1;
 const DYNAMIC_SCREEN_THRESHOLD: usize = 2; // Allow increase quality ratio if encode more than 2 times in one second
 const DELAY_THRESHOLD_150MS: u32 = 150; // 150ms is the threshold for good network condition
 

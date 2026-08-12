@@ -2332,6 +2332,56 @@ class CanvasModel with ChangeNotifier {
   Size get size => _size;
   ScrollStyle get scrollStyle => _scrollStyle;
   ViewStyle get viewStyle => _lastViewStyle;
+
+  bool get isZoomedIn => _scale > _lastViewStyle.scale * 1.02;
+
+  /// How much the remote image is magnified beyond fit.
+  ///
+  /// Zoom is a local canvas transform: the peer keeps encoding for the fit size
+  /// and the client scales those frames up, so zooming magnifies compression
+  /// artefacts rather than revealing detail. Asking the peer for proportionally
+  /// more quality is what turns the zoom into something worth looking at.
+  double get zoomFactor {
+    final fit = _lastViewStyle.scale;
+    if (fit <= 0) return 1.0;
+    return (_scale / fit).clamp(1.0, 4.0);
+  }
+
+  Timer? _qualityForZoomTimer;
+  int? _qualityAppliedForZoom;
+  int? _qualityBeforeZoom;
+
+  /// Raise the requested quality to match the zoom, and put it back on the way
+  /// out.
+  ///
+  /// Debounced: a pinch produces a continuous stream of scale updates, and
+  /// renegotiating quality on each one would thrash the encoder for the whole
+  /// gesture. Quality only follows once the fingers have settled.
+  void requestQualityForZoom() {
+    if (!(isDesktop || isWebDesktop)) return;
+    if (!(parent.target?.ffiModel.tabletMode ?? false)) return;
+    _qualityForZoomTimer?.cancel();
+    _qualityForZoomTimer = Timer(const Duration(milliseconds: 600), () async {
+      final sid = parent.target?.sessionId;
+      if (sid == null) return;
+      try {
+        _qualityBeforeZoom ??= int.tryParse(await bind.sessionGetOption(
+                    sessionId: sid, arg: 'custom_image_quality') ??
+                '') ??
+            50;
+        final base = _qualityBeforeZoom!;
+        // Capped at 100: past that the bitrate stops buying visible detail and
+        // starts costing frames.
+        final target =
+            isZoomedIn ? (base * zoomFactor).round().clamp(base, 100) : base;
+        if (target == _qualityAppliedForZoom) return;
+        _qualityAppliedForZoom = target;
+        await bind.sessionSetCustomImageQuality(sessionId: sid, value: target);
+      } catch (e) {
+        debugPrint('quality-for-zoom failed: $e');
+      }
+    });
+  }
   RxBool get imageOverflow => _imageOverflow;
 
   _resetScroll() => setScrollPercent(0.0, 0.0);
@@ -2792,6 +2842,8 @@ class CanvasModel with ChangeNotifier {
       isMobileCanvasChanged = true;
     } else if (_isTabletCanvas) {
       _tabletCanvasChanged = true;
+      // The zoom just changed, so what the peer should be encoding changed too.
+      requestQualityForZoom();
     }
     notifyListeners();
   }
