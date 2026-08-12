@@ -265,6 +265,12 @@ jobs:
         run: echo "SODIUM_LIB_DIR=$VCPKG_ROOT/installed/${{ matrix.job.vcpkg-triplet }}/lib" >> "$GITHUB_ENV"
 
       - name: Build rustdesk
+        env:
+          # Stamps this build so the updater can tell it apart from the one it
+          # replaces. Every Windows build is otherwise 1.4.9, with nothing to
+          # compare. Read at compile time by `common::FORK_BUILD`; a local build
+          # has no stamp and reports "dev".
+          IHP_BUILD: ${{ github.sha }}
         run: |
           # Windows: build RustDesk
           # --hwcodec is shared by all Windows targets; per-target extras (e.g. --vram) come from the matrix

@@ -2080,6 +2080,27 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+/// Which build of this fork is running, for the updater to compare against the
+/// latest published one.
+///
+/// Deliberately separate from `crate::VERSION`. That string is sent to peers for
+/// compatibility negotiation, so appending a fork suffix to it risks a stock
+/// RustDesk misreading the version of something it is talking to. This is ours
+/// alone and never leaves the client.
+///
+/// Set by CI as `IHP_BUILD` (the short commit SHA). A local build has no such
+/// stamp and reports "dev", which the updater treats as "never up to date" --
+/// better than claiming currency it can't prove.
+pub const FORK_BUILD: &str = match option_env!("IHP_BUILD") {
+    Some(v) => v,
+    None => "dev",
+};
+
+#[inline]
+pub fn get_fork_build() -> String {
+    FORK_BUILD.to_owned()
+}
+
 pub fn load_custom_client() {
     // This fork ships beside a stock RustDesk rather than replacing it. `APP_NAME`
     // is what `Config::path` derives %APPDATA%\<org>\<app> from, so moving it gives

@@ -1102,6 +1102,12 @@ pub fn main_get_app_name_sync() -> SyncReturn<String> {
     SyncReturn(get_app_name())
 }
 
+/// The fork build stamp, for the updater and the About screen. See
+/// `common::FORK_BUILD` for why this is separate from `VERSION`.
+pub fn main_get_fork_build_sync() -> SyncReturn<String> {
+    SyncReturn(crate::common::get_fork_build())
+}
+
 pub fn main_uri_prefix_sync() -> SyncReturn<String> {
     SyncReturn(crate::get_uri_prefix())
 }
