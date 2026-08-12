@@ -2461,11 +2461,13 @@ class _AboutState extends State<_About> {
       final license = await bind.mainGetLicense();
       final version = await bind.mainGetVersion();
       final buildDate = await bind.mainGetBuildDate();
+      final forkBuild = bind.mainGetForkBuildSync();
       final fingerprint = await bind.mainGetFingerprint();
       final myId = await bind.mainGetMyId();
       return {
         'license': license,
         'version': version,
+        'forkBuild': forkBuild,
         'buildDate': buildDate,
         'fingerprint': fingerprint,
         'myId': myId
@@ -2473,6 +2475,7 @@ class _AboutState extends State<_About> {
     }(), hasData: (data) {
       final license = data['license'].toString();
       final version = data['version'].toString();
+      final forkBuild = data['forkBuild'].toString();
       final buildDate = data['buildDate'].toString();
       final fingerprint = data['fingerprint'].toString();
       final myId = data['myId'].toString();
@@ -2489,6 +2492,12 @@ class _AboutState extends State<_About> {
               ),
               SelectionArea(
                   child: Text('${translate('Version')}: $version')
+                      .marginSymmetric(vertical: 4.0)),
+              // The fork build, which is what actually distinguishes one build
+              // from the next -- every one of them reports version 1.4.9. "dev"
+              // means it was built outside CI and carries no stamp.
+              SelectionArea(
+                  child: Text('${translate('Build')}: $forkBuild')
                       .marginSymmetric(vertical: 4.0)),
               SelectionArea(
                   child: Text('${translate('Build Date')}: $buildDate')
