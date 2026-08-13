@@ -4,7 +4,12 @@ project(rustdesk LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "rustdesk")
+# Must match APP_NAME. The Windows install path is built from get_app_name() --
+# Program Files\<app>\<app>.exe -- so a binary called rustdesk.exe installs into
+# an IHPortals folder that then has no IHPortals.exe to launch. Portable is
+# unaffected because it never consults those paths, which is why only the
+# installed copy was broken.
+set(BINARY_NAME "IHPortals")
 
 # Explicitly opt into modern CMake behaviors to avoid warnings with recent
 # versions of CMake.

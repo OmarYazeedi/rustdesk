@@ -355,7 +355,8 @@ jobs:
           sed -i '/dpiAware/d' res/manifest.xml
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          # IHPortals.exe, matching BINARY_NAME in flutter/windows/CMakeLists.txt.
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/IHPortals.exe
           popd
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
