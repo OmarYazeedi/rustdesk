@@ -943,8 +943,17 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
 /// this client's own `FORK_BUILD`.
 ///
 /// A plain file rather than the GitHub API: no rate limit, no auth, no JSON.
-pub const FORK_RELEASE_BASE: &str =
-    "https://github.com/OmarYazeedi/rustdesk/releases/download/windows-touch";
+/// Per-platform, because the two build workflows publish to different release
+/// tags -- the Windows one on every push to the branch, the Android one on a
+/// version tag. A single base would have Android checking the Windows stamp and
+/// offering to "update" to an .exe.
+pub fn fork_release_base() -> &'static str {
+    if cfg!(target_os = "android") {
+        "https://github.com/OmarYazeedi/rustdesk/releases/download/android"
+    } else {
+        "https://github.com/OmarYazeedi/rustdesk/releases/download/windows-touch"
+    }
+}
 
 pub fn check_software_update() {
     // Upstream skips the check entirely for a renamed client, because its
@@ -965,7 +974,7 @@ pub fn check_software_update() {
 /// download so the UI can offer it.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_fork_update() -> hbb_common::ResultType<()> {
-    let url = format!("{}/BUILD", FORK_RELEASE_BASE);
+    let url = format!("{}/BUILD", fork_release_base());
     let client = create_http_client_async(TlsType::Rustls, false);
     let published = client
         .get(&url)
@@ -985,10 +994,11 @@ pub async fn do_check_fork_update() -> hbb_common::ResultType<()> {
         return Ok(());
     }
 
-    let download = if cfg!(target_os = "windows") {
-        format!("{}/rustdesk-{}-x86_64.exe", FORK_RELEASE_BASE, crate::VERSION)
+    let download = if cfg!(target_os = "android") {
+        // The arm64 apk: the only one worth offering to a modern phone.
+        format!("{}/rustdesk-{}-aarch64.apk", fork_release_base(), crate::VERSION)
     } else {
-        FORK_RELEASE_BASE.to_owned()
+        format!("{}/rustdesk-{}-x86_64.exe", fork_release_base(), crate::VERSION)
     };
     log::info!("fork update available: {} -> {}", FORK_BUILD, published);
     #[cfg(feature = "flutter")]

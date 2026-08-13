@@ -1239,6 +1239,24 @@ jobs:
           files: |
             signed-apk/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.apk
 
+      # The Android release needs its own stamp: the two workflows publish to
+      # different tags, so a phone checking the Windows one would compare against
+      # a build it can't install.
+      - name: Write build stamp
+        if: env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          mkdir -p stamp
+          echo -n "${{ github.sha }}" > stamp/BUILD
+
+      - name: Publish build stamp
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          prerelease: true
+          tag_name: ${{ env.TAG_NAME }}
+          files: |
+            stamp/BUILD
+
   build-rustdesk-android-universal:
     needs: [build-rustdesk-android]
     name: build rustdesk android universal apk
