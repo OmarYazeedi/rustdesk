@@ -132,6 +132,25 @@ class MainActivity : FlutterActivity() {
         flutterMethodChannel.setMethodCallHandler { call, result ->
             // make sure result will be invoked, otherwise flutter will await forever
             when (call.method) {
+                // Download an update and hand it to the package installer.
+                // Returns immediately with "started"; the outcome arrives later
+                // through on_apk_install_result, because the download is not
+                // something to block the UI thread on.
+                "install_apk" -> {
+                    val url = call.argument<String>("url")
+                    if (url.isNullOrEmpty()) {
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    ApkInstaller.installFromUrl(this, url) { outcome ->
+                        runOnUiThread {
+                            flutterMethodChannel.invokeMethod(
+                                "on_apk_install_result", mapOf("result" to outcome)
+                            )
+                        }
+                    }
+                    result.success(true)
+                }
                 "init_service" -> {
                     Intent(activity, MainService::class.java).also {
                         bindService(it, serviceConnection, Context.BIND_AUTO_CREATE)

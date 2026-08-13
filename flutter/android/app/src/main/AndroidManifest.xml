@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Installing a downloaded update from inside the app. The user still has
+         to allow this app to install unknown apps; the permission only makes the
+         request possible. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
         <intent>
@@ -103,6 +107,20 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Serves the downloaded apk to the package installer. Android refuses
+             a file:// uri for installs on API 24+, so it has to be content://.
+             The authority is derived from the applicationId, which differs from
+             the Kotlin package here, so it is written out rather than assumed. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.ihportals.app.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!--
  Don't delete the meta-data below.

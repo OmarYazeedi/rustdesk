@@ -918,6 +918,18 @@ void androidChannelInit() {
             closeConnection();
             break;
           }
+        // Outcome of an update install. Surfaced because a download that fails
+        // silently looks identical to one still in progress.
+        case "on_apk_install_result":
+          {
+            final r = arguments["result"] as String? ?? '';
+            if (r == 'permission') {
+              showToast(translate('Allow installing apps, then try again'));
+            } else if (r.startsWith('error:')) {
+              showToast('${translate('Update failed')}: ${r.substring(6)}');
+            }
+            break;
+          }
         case "on_state_changed":
           {
             var name = arguments["name"] as String;

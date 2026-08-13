@@ -130,6 +130,15 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ? const SizedBox(height: 0)
         : InkWell(
             onTap: () async {
+              // Install in place on Android rather than handing the user a
+              // browser download to find and tap. Android's own installer still
+              // asks for confirmation -- this removes the fetching, not the
+              // consent.
+              if (isAndroid) {
+                gFFI.invokeMethod('install_apk', {'url': updateUrl});
+                showToast(translate('Downloading update...'));
+                return;
+              }
               // The url the check produced, not rustdesk.com. Upstream hardcodes
               // its own download page here and ignores the argument entirely --
               // which for this fork would send you to a stock RustDesk build,

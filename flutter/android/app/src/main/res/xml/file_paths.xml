@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paths the FileProvider is allowed to hand out.
+
+  Only the downloaded update lives here. Android will not install an apk from a
+  file:// path on API 24+, so the installer intent needs a content:// uri, and
+  that means a provider. Scoped to one subdirectory of the cache rather than the
+  whole of it, so the provider can never be talked into serving something else
+  the app happens to have cached.
+-->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>
