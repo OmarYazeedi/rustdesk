@@ -85,8 +85,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
       slivers: [
         SliverList(
             delegate: SliverChildListDelegate([
-          if (!bind.isCustomClient() && !isIOS)
-            Obx(() => _buildUpdateUI(stateGlobal.updateUrl.value)),
+          // Not gated on isCustomClient any more. That test is true for this
+          // fork -- it means "renamed" -- so the update banner was hidden on
+          // exactly the build that now has its own releases to point at.
+          if (!isIOS) Obx(() => _buildUpdateUI(stateGlobal.updateUrl.value)),
           _buildRemoteIDTextField(),
         ])),
         SliverFillRemaining(
@@ -128,7 +130,11 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ? const SizedBox(height: 0)
         : InkWell(
             onTap: () async {
-              final url = 'https://rustdesk.com/download';
+              // The url the check produced, not rustdesk.com. Upstream hardcodes
+              // its own download page here and ignores the argument entirely --
+              // which for this fork would send you to a stock RustDesk build,
+              // the exact swap the updater exists to avoid.
+              final url = updateUrl;
               // https://pub.dev/packages/url_launcher#configuration
               // https://developer.android.com/training/package-visibility/use-cases#open-urls-custom-tabs
               //
