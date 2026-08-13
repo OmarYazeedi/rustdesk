@@ -371,7 +371,11 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           pushd ./res/msi
-          python preprocess.py --arp -d ../../rustdesk
+          # --app-name defaults to "RustDesk", which would both fail to locate
+          # the renamed IHPortals.exe and derive upstream's UpgradeCode, making
+          # this MSI an upgrade of any stock RustDesk install. Pass it so the
+          # product is a distinct application.
+          python preprocess.py --arp -d ../../rustdesk --app-name IHPortals
           nuget restore msi.sln
           $msiPlatform = if ('${{ matrix.job.arch }}' -eq 'aarch64') { 'ARM64' } else { 'x64' }
           msbuild msi.sln -p:Configuration=Release -p:Platform=$msiPlatform /p:TargetVersion=Windows10
