@@ -1156,6 +1156,9 @@ void showAbout(OverlayDialogManager dialogManager) {
       title: Text(translate('About RustDesk')),
       content: Wrap(direction: Axis.vertical, spacing: 12, children: [
         Text('Version: $version'),
+        // The fork build. Version alone says 1.4.9 for every build ever made, so
+        // this is the only thing that identifies which one is installed.
+        Text('Build: ${bind.mainGetForkBuildSync()}'),
         InkWell(
             onTap: () async {
               const url = 'https://rustdesk.com/';
