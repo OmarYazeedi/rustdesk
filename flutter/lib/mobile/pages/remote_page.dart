@@ -715,9 +715,16 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                               hasData: (isSupportVoiceCall) => IconButton(
                                     color: MyTheme.accent,
                                     icon: isAndroid && isSupportVoiceCall
+                                        // An SvgPicture paints itself and does
+                                        // not inherit IconButton.color the way
+                                        // an Icon does, so this has to be told
+                                        // the accent explicitly or it stays the
+                                        // upstream white while its neighbours
+                                        // follow the theme.
                                         ? SvgPicture.asset('assets/chat.svg',
                                             colorFilter: ColorFilter.mode(
-                                                Colors.white, BlendMode.srcIn))
+                                                MyTheme.accent,
+                                                BlendMode.srcIn))
                                         : Icon(Icons.message),
                                     onPressed: () =>
                                         isAndroid && isSupportVoiceCall

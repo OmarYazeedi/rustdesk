@@ -335,9 +335,12 @@ class _ViewCameraPageState extends State<ViewCameraPage>
                               hasData: (isSupportVoiceCall) => IconButton(
                                     color: MyTheme.accent,
                                     icon: isAndroid && isSupportVoiceCall
+                                        // Same as the remote page: an SvgPicture
+                                        // does not inherit IconButton.color.
                                         ? SvgPicture.asset('assets/chat.svg',
                                             colorFilter: ColorFilter.mode(
-                                                Colors.white, BlendMode.srcIn))
+                                                MyTheme.accent,
+                                                BlendMode.srcIn))
                                         : Icon(Icons.message),
                                     onPressed: () =>
                                         isAndroid && isSupportVoiceCall
