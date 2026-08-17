@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/models/state_model.dart';
 
 import 'peer_card.dart';
 
@@ -83,9 +85,24 @@ class UnifiedPeersView extends StatefulWidget {
   State<UnifiedPeersView> createState() => _UnifiedPeersViewState();
 }
 
-class _UnifiedPeersViewState extends State<UnifiedPeersView> {
+class _UnifiedPeersViewState extends State<UnifiedPeersView>
+    with WidgetsBindingObserver {
   late Set<PeerSource> _shown;
   late PeerSort _sort;
+
+  // Online status is not pushed by the server; something has to ask for it.
+  // Upstream's `_PeersViewState` ran this poll, and replacing that widget with
+  // this one dropped it -- leaving `Peer.online` frozen at whatever it loaded
+  // with, so the status dot never moved. Same cadence and the same guards as
+  // upstream, deliberately: a faster poll here is paid for in battery.
+  static const int _maxQueryCount = 3;
+  final _curPeers = <String>{};
+  var _lastQueryPeers = <String>{};
+  var _lastChangeTime = DateTime.now();
+  var _lastQueryTime = DateTime.now().subtract(const Duration(hours: 1));
+  var _queryCount = 0;
+  var _exit = false;
+  var _queryInterval = const Duration(seconds: 20);
 
   Map<PeerSource, Peers> get _models => {
         PeerSource.recent: gFFI.recentPeersModel,
@@ -98,6 +115,8 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startCheckOnlines();
     // Everything on by default, and written out on first run rather than
     // inferred from absent keys -- an empty-looking list on a fresh config is
     // indistinguishable from a broken one.
@@ -128,6 +147,71 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView> {
       gFFI.groupModel.pull(force: false);
     } catch (_) {
       // Not signed in, or no group. Neither is an error worth surfacing here.
+    }
+  }
+
+  @override
+  void dispose() {
+    _exit = true;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Coming back from the background, the dots on screen are as old as the
+    // time spent away, so re-ask immediately instead of waiting out the
+    // interval. While away, the skip below stops the polling entirely.
+    if (state == AppLifecycleState.resumed) {
+      _queryCount = 0;
+      _queryOnlines(false);
+    }
+  }
+
+  void _startCheckOnlines() {
+    () async {
+      final usingPublic = await bind.mainIsUsingPublicServer();
+      if (!usingPublic) {
+        // Our own server can be asked more often without being a bad citizen.
+        _queryInterval = const Duration(seconds: 6);
+      }
+      while (!_exit) {
+        final now = DateTime.now();
+        if (!setEquals(_curPeers, _lastQueryPeers)) {
+          if (now.difference(_lastChangeTime) > const Duration(seconds: 1)) {
+            _queryOnlines(false);
+          }
+        } else {
+          // Off the main page the list is not visible, so polling there is
+          // pure battery cost. On the public server we also stop after a few
+          // rounds, as upstream does, rather than poll their infrastructure
+          // forever.
+          final skip = (isAndroid || isIOS) && !stateGlobal.isInMainPage;
+          if (!skip && (_queryCount < _maxQueryCount || !usingPublic)) {
+            if (now.difference(_lastQueryTime) >= _queryInterval &&
+                _curPeers.isNotEmpty) {
+              bind.queryOnlines(ids: _curPeers.toList(growable: false));
+              _lastQueryTime = DateTime.now();
+              _queryCount += 1;
+            }
+          }
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    }();
+  }
+
+  void _queryOnlines(bool isLoadEvent) {
+    if (_curPeers.isNotEmpty) {
+      bind.queryOnlines(ids: _curPeers.toList(growable: false));
+      _queryCount = 0;
+    }
+    _lastQueryPeers = {..._curPeers};
+    if (isLoadEvent) {
+      _lastChangeTime = DateTime.now();
+    } else {
+      _lastQueryTime = DateTime.now().subtract(_queryInterval);
     }
   }
 
@@ -291,6 +375,17 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView> {
       animation: Listenable.merge(_models.values.toList()),
       builder: (context, _) {
         final entries = _merge();
+        // Whatever is on screen is what we want status for. The poll compares
+        // this against the last set it asked about, so a device appearing --
+        // from a fresh address-book pull, or a LAN discovery -- gets queried
+        // rather than waiting out the interval showing a stale dot.
+        final ids = entries.map((e) => e.peer.id).toSet();
+        if (!setEquals(ids, _curPeers)) {
+          _curPeers
+            ..clear()
+            ..addAll(ids);
+          _lastChangeTime = DateTime.now();
+        }
         // The multi-select bar and the toolbar actions read the current tab's
         // cached peers. With the tabs gone, this list is what they should see.
         gFFI.peerTabModel
