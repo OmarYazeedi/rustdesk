@@ -659,89 +659,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
         mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
-          Row(
-              children: <Widget>[
-                    IconButton(
-                      color: MyTheme.accent,
-                      icon: Icon(Icons.clear),
-                      onPressed: () {
-                        clientClose(sessionId, gFFI);
-                      },
-                    ),
-                    IconButton(
-                      color: MyTheme.accent,
-                      icon: Icon(Icons.tv),
-                      onPressed: () {
-                        setState(() => _showEdit = false);
-                        showOptions(context, widget.id, gFFI.dialogManager);
-                      },
-                    )
-                  ] +
-                  (isWebDesktop || ffiModel.viewOnly || !ffiModel.keyboard
-                      ? []
-                      : gFFI.ffiModel.isPeerAndroid
-                          ? [
-                              IconButton(
-                                  color: MyTheme.accent,
-                                  icon: Icon(Icons.keyboard),
-                                  onPressed: openKeyboard),
-                              IconButton(
-                                color: MyTheme.accent,
-                                icon: const Icon(Icons.build),
-                                onPressed: () => gFFI.dialogManager
-                                    .toggleMobileActionsOverlay(ffi: gFFI),
-                              )
-                            ]
-                          : [
-                              IconButton(
-                                  color: MyTheme.accent,
-                                  icon: Icon(Icons.keyboard),
-                                  onPressed: openKeyboard),
-                              IconButton(
-                                color: MyTheme.accent,
-                                icon: Icon(gFFI.ffiModel.touchMode
-                                    ? Icons.touch_app
-                                    : Icons.mouse),
-                                onPressed: () => setState(
-                                    () => _showGestureHelp = !_showGestureHelp),
-                              ),
-                            ]) +
-                  (isWeb
-                      ? []
-                      : <Widget>[
-                          futureBuilder(
-                              future: gFFI.invokeMethod(
-                                  "get_value", "KEY_IS_SUPPORT_VOICE_CALL"),
-                              hasData: (isSupportVoiceCall) => IconButton(
-                                    color: MyTheme.accent,
-                                    icon: isAndroid && isSupportVoiceCall
-                                        // An SvgPicture paints itself and does
-                                        // not inherit IconButton.color the way
-                                        // an Icon does, so this has to be told
-                                        // the accent explicitly or it stays the
-                                        // upstream white while its neighbours
-                                        // follow the theme.
-                                        ? SvgPicture.asset('assets/chat.svg',
-                                            colorFilter: ColorFilter.mode(
-                                                MyTheme.accent,
-                                                BlendMode.srcIn))
-                                        : Icon(Icons.message),
-                                    onPressed: () =>
-                                        isAndroid && isSupportVoiceCall
-                                            ? showChatOptions(widget.id)
-                                            : onPressedTextChat(widget.id),
-                                  ))
-                        ]) +
-                  [
-                    IconButton(
-                      color: MyTheme.accent,
-                      icon: Icon(Icons.more_vert),
-                      onPressed: () {
-                        setState(() => _showEdit = false);
-                        showActions(widget.id);
-                      },
-                    ),
-                  ]),
+          // Long-press anywhere on the buttons to rearrange them.
+          GestureDetector(
+            onLongPress: showRearrangeToolbar,
+            child: Row(children: _orderedBarButtons(ffiModel)),
+          ),
           Obx(() => IconButton(
                 color: MyTheme.accent,
                 icon: Icon(Icons.expand_more),
@@ -755,6 +677,196 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  /// The toolbar buttons in declaration order, each tagged with a stable id.
+  ///
+  /// Which buttons exist depends on the session -- an Android peer gets the
+  /// mobile-actions button where other peers get the gesture toggle, and web
+  /// has no chat -- so this is rebuilt per frame rather than cached, and the
+  /// saved order is applied over whatever is actually available.
+  List<MapEntry<String, Widget>> _barButtons(FfiModel ffiModel) {
+    final items = <MapEntry<String, Widget>>[];
+    void add(String id, Widget w) => items.add(MapEntry(id, w));
+
+    add(
+        'close',
+        IconButton(
+          color: MyTheme.accent,
+          icon: Icon(Icons.clear),
+          onPressed: () {
+            clientClose(sessionId, gFFI);
+          },
+        ));
+    add(
+        'options',
+        IconButton(
+          color: MyTheme.accent,
+          icon: Icon(Icons.tv),
+          onPressed: () {
+            setState(() => _showEdit = false);
+            showOptions(context, widget.id, gFFI.dialogManager);
+          },
+        ));
+    if (!(isWebDesktop || ffiModel.viewOnly || !ffiModel.keyboard)) {
+      add(
+          'keyboard',
+          IconButton(
+              color: MyTheme.accent,
+              icon: Icon(Icons.keyboard),
+              onPressed: openKeyboard));
+      if (gFFI.ffiModel.isPeerAndroid) {
+        add(
+            'actions',
+            IconButton(
+              color: MyTheme.accent,
+              icon: const Icon(Icons.build),
+              onPressed: () =>
+                  gFFI.dialogManager.toggleMobileActionsOverlay(ffi: gFFI),
+            ));
+      } else {
+        add(
+            'gestures',
+            IconButton(
+              color: MyTheme.accent,
+              icon: Icon(
+                  gFFI.ffiModel.touchMode ? Icons.touch_app : Icons.mouse),
+              onPressed: () =>
+                  setState(() => _showGestureHelp = !_showGestureHelp),
+            ));
+      }
+    }
+    if (!isWeb) {
+      add(
+          'chat',
+          futureBuilder(
+              future:
+                  gFFI.invokeMethod("get_value", "KEY_IS_SUPPORT_VOICE_CALL"),
+              hasData: (isSupportVoiceCall) => IconButton(
+                    color: MyTheme.accent,
+                    icon: isAndroid && isSupportVoiceCall
+                        // An SvgPicture paints itself and does not inherit
+                        // IconButton.color the way an Icon does, so this has to
+                        // be told the accent explicitly or it stays the upstream
+                        // white while its neighbours follow the theme.
+                        ? SvgPicture.asset('assets/chat.svg',
+                            colorFilter: ColorFilter.mode(
+                                MyTheme.accent, BlendMode.srcIn))
+                        : Icon(Icons.message),
+                    onPressed: () => isAndroid && isSupportVoiceCall
+                        ? showChatOptions(widget.id)
+                        : onPressedTextChat(widget.id),
+                  )));
+    }
+    add(
+        'more',
+        IconButton(
+          color: MyTheme.accent,
+          icon: Icon(Icons.more_vert),
+          onPressed: () {
+            setState(() => _showEdit = false);
+            showActions(widget.id);
+          },
+        ));
+    return items;
+  }
+
+  List<String> get _savedBarOrder =>
+      bind.mainGetLocalOption(key: kOptionMobileToolbarOrder)
+          .split(',')
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+  /// Saved order first, then anything it does not mention, in declaration
+  /// order. Sorting by index would need a stable sort and would silently drop
+  /// buttons the saved order predates; this cannot.
+  List<Widget> _orderedBarButtons(FfiModel ffiModel) {
+    final items = _barButtons(ffiModel);
+    final byId = {for (final e in items) e.key: e.value};
+    final ordered = <Widget>[];
+    for (final id in _savedBarOrder) {
+      final w = byId.remove(id);
+      if (w != null) ordered.add(w);
+    }
+    for (final e in items) {
+      if (byId.containsKey(e.key)) ordered.add(byId.remove(e.key)!);
+    }
+    return ordered;
+  }
+
+  String _barButtonLabel(String id) {
+    switch (id) {
+      case 'close':
+        return translate('Close');
+      case 'options':
+        return translate('Display Settings');
+      case 'keyboard':
+        return translate('Keyboard');
+      case 'actions':
+        return translate('Actions');
+      case 'gestures':
+        return translate('Mouse');
+      case 'chat':
+        return translate('Chat');
+      case 'more':
+        return translate('More');
+    }
+    return id;
+  }
+
+  void showRearrangeToolbar() {
+    final ffiModel = Provider.of<FfiModel>(context, listen: false);
+    // Only what this session actually shows -- offering to arrange a button
+    // that is not on the bar would be arranging nothing.
+    final available = _barButtons(ffiModel).map((e) => e.key).toList();
+    final order = <String>[];
+    for (final id in _savedBarOrder) {
+      if (available.contains(id)) order.add(id);
+    }
+    for (final id in available) {
+      if (!order.contains(id)) order.add(id);
+    }
+
+    gFFI.dialogManager.show((setStateDialog, close, context) => CustomAlertDialog(
+          title: Text(translate('Rearrange toolbar')),
+          content: SizedBox(
+            width: 320,
+            height: 340,
+            child: ReorderableListView(
+              buildDefaultDragHandles: true,
+              children: [
+                for (final id in order)
+                  ListTile(
+                    key: ValueKey(id),
+                    leading: Icon(Icons.drag_handle, color: MyTheme.accent),
+                    title: Text(_barButtonLabel(id)),
+                  )
+              ],
+              onReorder: (oldIndex, newIndex) {
+                setStateDialog(() {
+                  // ReorderableListView reports the insertion point before the
+                  // item is removed, so anything moving down is off by one.
+                  if (newIndex > oldIndex) newIndex -= 1;
+                  order.insert(newIndex, order.removeAt(oldIndex));
+                });
+              },
+            ),
+          ),
+          actions: [
+            dialogButton(translate('Reset'), onPressed: () {
+              bind.mainSetLocalOption(
+                  key: kOptionMobileToolbarOrder, value: '');
+              close();
+              setState(() {});
+            }, isOutline: true),
+            dialogButton(translate('OK'), onPressed: () {
+              bind.mainSetLocalOption(
+                  key: kOptionMobileToolbarOrder, value: order.join(','));
+              close();
+              setState(() {});
+            }),
+          ],
+        ));
   }
 
   bool get showCursorPaint =>

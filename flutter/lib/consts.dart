@@ -159,6 +159,10 @@ const String kOptionKeepSessionAlive = "keep-session-alive";
 // visible instead of inheriting a stale blob.
 const String kOptionUnifiedShowPrefix = "unified-show-";
 const String kOptionUnifiedSort = "unified-sort";
+// Comma-separated toolbar button ids, in the order the user arranged them.
+// Ids that are absent (a button added by a later version) fall in after these
+// in declaration order, so an old saved order never hides a new button.
+const String kOptionMobileToolbarOrder = "mobile-toolbar-order";
 const String kOptionUnifiedList = "unified-list";
 // The floating keyboard button: whether it's loose on the canvas or pinned away
 // into the toolbar, and where the user last left it. Position is stored as a
