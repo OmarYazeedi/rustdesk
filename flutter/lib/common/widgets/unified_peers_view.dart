@@ -287,41 +287,90 @@ class _UnifiedPeersViewState extends State<UnifiedPeersView>
   }
 
   Widget _controls() {
+    final hiddenCount = PeerSource.values.length - _shown.length;
+    final filtering = hiddenCount > 0;
+    final labelStyle = TextStyle(fontSize: 13, color: MyTheme.accent);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-        ...PeerSource.values.map((s) {
-          final on = _shown.contains(s);
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: FilterChip(
-              avatar: Icon(s.icon, size: 16),
-              label: Text(translate(s.label)),
-              selected: on,
-              // Without this the selected state swaps the source icon for a
-              // tick, so a row of selected chips loses the very glyphs that say
-              // what each one is.
-              showCheckmark: false,
-              onSelected: (_) => _toggleSource(s),
-              visualDensity: VisualDensity.compact,
-            ),
-          );
-        }),
-        const SizedBox(width: 4),
-        Tooltip(
-          message: translate('Sort by'),
-          child: ActionChip(
-            avatar: const Icon(Icons.sort_rounded, size: 16),
-            label: Text(translate(_sortLabel)),
-            onPressed: _cycleSort,
-            visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(children: [
+        // One control instead of five chips. The chips signalled selection by
+        // fill alone, which on the dark theme is nearly invisible, and they ate
+        // a full row on a narrow screen. A count appears only when something is
+        // actually filtered out -- a badge that is always present says nothing.
+        InkWell(
+          onTap: _showFilterDialog,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                  filtering
+                      ? Icons.filter_alt
+                      : Icons.filter_alt_outlined,
+                  size: 18,
+                  color: MyTheme.accent),
+              if (filtering)
+                Text(' ' + hiddenCount.toString() + ' ' + translate('hidden'),
+                    style: labelStyle),
+            ]),
           ),
         ),
-        ]),
-      ),
+        const Spacer(),
+        InkWell(
+          onTap: _cycleSort,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.sort_rounded, size: 16, color: MyTheme.accent),
+              const SizedBox(width: 6),
+              Text(translate(_sortLabel), style: labelStyle),
+            ]),
+          ),
+        ),
+      ]),
     );
+  }
+
+  /// Checkboxes, not chips: what is on and what is off has to be readable at a
+  /// glance rather than inferred from a fill colour. Counts are shown because
+  /// "Discovered (0)" explains an empty-looking list without anyone guessing.
+  void _showFilterDialog() {
+    final counts = <PeerSource, int>{};
+    _models.forEach((source, model) {
+      counts[source] = model.peers.where((p) => p.id.isNotEmpty).length;
+    });
+    gFFI.dialogManager.show((setStateDialog, close, context) => CustomAlertDialog(
+          title: Text(translate('Filter')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: PeerSource.values
+                .map((s) => CheckboxListTile(
+                      value: _shown.contains(s),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                      secondary: Icon(s.icon, size: 18, color: MyTheme.accent),
+                      title: Text(translate(s.label) +
+                          '  (' +
+                          (counts[s] ?? 0).toString() +
+                          ')'),
+                      onChanged: (_) {
+                        _toggleSource(s);
+                        setStateDialog(() {});
+                      },
+                    ))
+                .toList(),
+          ),
+          actions: [
+            dialogButton(translate('Show all'), onPressed: () {
+              for (final s in PeerSource.values) {
+                if (!_shown.contains(s)) _toggleSource(s);
+              }
+              setStateDialog(() {});
+            }, isOutline: true),
+            dialogButton(translate('Close'), onPressed: close),
+          ],
+        ));
   }
 
   String get _sortLabel {
