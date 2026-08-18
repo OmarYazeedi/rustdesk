@@ -1017,7 +1017,7 @@ class RecentPeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => bind.mainLoadRecentPeers();
+  void _update() => reloadLocalPeerSources();
 }
 
 class FavoritePeerCard extends BasePeerCard {
@@ -1077,7 +1077,7 @@ class FavoritePeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => bind.mainLoadFavPeers();
+  void _update() => reloadLocalPeerSources();
 }
 
 class DiscoveredPeerCard extends BasePeerCard {
@@ -1136,7 +1136,7 @@ class DiscoveredPeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => bind.mainLoadLanPeers();
+  void _update() => reloadLocalPeerSources();
 }
 
 class AddressBookPeerCard extends BasePeerCard {
@@ -1208,8 +1208,11 @@ class AddressBookPeerCard extends BasePeerCard {
   // address book does not need to update
   @protected
   @override
-  void _update() =>
-      {}; //gFFI.abModel.pullAb(force: ForcePullAb.current, quiet: true);
+  // Was a no-op. In the merged list an address-book card is usually the
+  // one drawn, so leaving it inert meant favouriting a device there never
+  // refreshed the favourite mark. The commented-out network pull is left
+  // as it was; this only reloads the cheap local sources.
+  void _update() => reloadLocalPeerSources();
 
   @protected
   MenuEntryBase<String> _editTagAction(String id) {
@@ -1344,7 +1347,10 @@ class MyGroupPeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => gFFI.groupModel.pull();
+  void _update() {
+    gFFI.groupModel.pull();
+    reloadLocalPeerSources();
+  }
 }
 
 void _rdpDialog(String id) async {
@@ -1578,4 +1584,22 @@ void connectInPeerTab(BuildContext context, Peer peer, PeerTabIndex tab,
       isViewCamera: isViewCamera,
       isTcpTunneling: isTcpTunneling,
       isRDP: isRDP);
+}
+
+/// Reload every *local* peer source.
+///
+/// A card used to refresh only the model it came from, which was correct
+/// while each tab showed exactly one source. In the merged device list a
+/// peer gets a single card chosen by precedence, so favouriting from a
+/// Recent card reloaded only the recent model and the favourite mark never
+/// appeared. Reloading all three makes the marks independent of which card
+/// happened to win that contest.
+///
+/// Deliberately excludes the address book and group: those are network
+/// pulls, and firing them on every local mutation would turn a tap into a
+/// round trip.
+void reloadLocalPeerSources() {
+  bind.mainLoadRecentPeers();
+  bind.mainLoadFavPeers();
+  bind.mainLoadLanPeers();
 }
