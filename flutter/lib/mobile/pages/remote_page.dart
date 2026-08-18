@@ -89,6 +89,10 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   final TextEditingController _textController =
       TextEditingController(text: initText);
 
+  // Cached rather than re-asked every frame: the bar and the more-menu
+  // both need it, and it cannot change during a session.
+  bool _isSupportVoiceCall = false;
+
   _RemotePageState(String id) {
     initSharedStates(id);
     gFFI.chatModel.voiceCallStatus.value = VoiceCallStatus.notStarted;
@@ -98,6 +102,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    gFFI
+        .invokeMethod("get_value", "KEY_IS_SUPPORT_VOICE_CALL")
+        .then((v) {
+      if (mounted && v == true) setState(() => _isSupportVoiceCall = true);
+    });
     gFFI.ffiModel.updateEventListener(sessionId, widget.id);
     gFFI.start(
       widget.id,
@@ -679,194 +688,168 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     );
   }
 
-  /// The toolbar buttons in declaration order, each tagged with a stable id.
+  /// Toolbar buttons in declaration order, each with a stable id.
   ///
-  /// Which buttons exist depends on the session -- an Android peer gets the
-  /// mobile-actions button where other peers get the gesture toggle, and web
-  /// has no chat -- so this is rebuilt per frame rather than cached, and the
-  /// saved order is applied over whatever is actually available.
-  List<MapEntry<String, Widget>> _barButtons(FfiModel ffiModel) {
-    final items = <MapEntry<String, Widget>>[];
-    void add(String id, Widget w) => items.add(MapEntry(id, w));
+  /// Reduced to the parts both surfaces need, because a button can now live
+  /// either on the bar or in the more-menu and must behave identically in
+  /// both. Which buttons exist depends on the session, so this is rebuilt per
+  /// frame and the saved layout is applied over whatever is actually here.
+  List<_BarAction> _barActions(FfiModel ffiModel) {
+    final items = <_BarAction>[];
 
-    add(
-        'close',
-        IconButton(
-          color: MyTheme.accent,
-          icon: Icon(Icons.clear),
-          onPressed: () {
-            clientClose(sessionId, gFFI);
-          },
-        ));
-    add(
-        'options',
-        IconButton(
-          color: MyTheme.accent,
-          icon: Icon(Icons.tv),
-          onPressed: () {
-            setState(() => _showEdit = false);
-            showOptions(context, widget.id, gFFI.dialogManager);
-          },
-        ));
+    items.add(_BarAction('close', Icon(Icons.clear), translate('Close'),
+        () => clientClose(sessionId, gFFI)));
+    items.add(_BarAction('options', Icon(Icons.tv),
+        translate('Display Settings'), () {
+      setState(() => _showEdit = false);
+      showOptions(context, widget.id, gFFI.dialogManager);
+    }));
     if (!(isWebDesktop || ffiModel.viewOnly || !ffiModel.keyboard)) {
-      add(
-          'keyboard',
-          IconButton(
-              color: MyTheme.accent,
-              icon: Icon(Icons.keyboard),
-              onPressed: openKeyboard));
+      items.add(_BarAction('keyboard', Icon(Icons.keyboard),
+          translate('Keyboard'), openKeyboard));
       if (gFFI.ffiModel.isPeerAndroid) {
-        add(
-            'actions',
-            IconButton(
-              color: MyTheme.accent,
-              icon: const Icon(Icons.build),
-              onPressed: () =>
-                  gFFI.dialogManager.toggleMobileActionsOverlay(ffi: gFFI),
-            ));
+        items.add(_BarAction('actions', const Icon(Icons.build),
+            translate('Actions'),
+            () => gFFI.dialogManager.toggleMobileActionsOverlay(ffi: gFFI)));
       } else {
-        add(
+        items.add(_BarAction(
             'gestures',
-            IconButton(
-              color: MyTheme.accent,
-              icon: Icon(
-                  gFFI.ffiModel.touchMode ? Icons.touch_app : Icons.mouse),
-              onPressed: () =>
-                  setState(() => _showGestureHelp = !_showGestureHelp),
-            ));
+            Icon(gFFI.ffiModel.touchMode ? Icons.touch_app : Icons.mouse),
+            translate('Mouse'),
+            () => setState(() => _showGestureHelp = !_showGestureHelp)));
       }
     }
     if (!isWeb) {
-      add(
+      final voice = isAndroid && _isSupportVoiceCall;
+      items.add(_BarAction(
           'chat',
-          futureBuilder(
-              future:
-                  gFFI.invokeMethod("get_value", "KEY_IS_SUPPORT_VOICE_CALL"),
-              hasData: (isSupportVoiceCall) => IconButton(
-                    color: MyTheme.accent,
-                    icon: isAndroid && isSupportVoiceCall
-                        // An SvgPicture paints itself and does not inherit
-                        // IconButton.color the way an Icon does, so this has to
-                        // be told the accent explicitly or it stays the upstream
-                        // white while its neighbours follow the theme.
-                        ? SvgPicture.asset('assets/chat.svg',
-                            colorFilter: ColorFilter.mode(
-                                MyTheme.accent, BlendMode.srcIn))
-                        : Icon(Icons.message),
-                    onPressed: () => isAndroid && isSupportVoiceCall
-                        ? showChatOptions(widget.id)
-                        : onPressedTextChat(widget.id),
-                  )));
+          // An SvgPicture paints itself and does not inherit IconButton.color
+          // the way an Icon does, so it has to be told the accent explicitly
+          // or it stays the upstream white while its neighbours follow theme.
+          voice
+              ? SvgPicture.asset('assets/chat.svg',
+                  colorFilter:
+                      ColorFilter.mode(MyTheme.accent, BlendMode.srcIn))
+              : Icon(Icons.message),
+          translate('Chat'),
+          () => voice ? showChatOptions(widget.id) : onPressedTextChat(widget.id)));
     }
-    add(
-        'more',
-        IconButton(
-          color: MyTheme.accent,
-          icon: Icon(Icons.more_vert),
-          onPressed: () {
-            setState(() => _showEdit = false);
-            showActions(widget.id);
-          },
-        ));
     return items;
   }
 
-  List<String> get _savedBarOrder =>
-      bind.mainGetLocalOption(key: kOptionMobileToolbarOrder)
-          .split(',')
-          .where((e) => e.isNotEmpty)
-          .toList();
+  List<String> _savedList(String key) => bind
+      .mainGetLocalOption(key: key)
+      .split(',')
+      .where((e) => e.isNotEmpty)
+      .toList();
+
+  /// Ids the user moved off the bar. They are not hidden -- they move to the
+  /// more-menu, so every action stays reachable no matter how the bar is set.
+  List<String> get _moreIds => _savedList(kOptionMobileToolbarMore);
 
   /// Saved order first, then anything it does not mention, in declaration
-  /// order. Sorting by index would need a stable sort and would silently drop
-  /// buttons the saved order predates; this cannot.
-  List<Widget> _orderedBarButtons(FfiModel ffiModel) {
-    final items = _barButtons(ffiModel);
-    final byId = {for (final e in items) e.key: e.value};
-    final ordered = <Widget>[];
-    for (final id in _savedBarOrder) {
-      final w = byId.remove(id);
-      if (w != null) ordered.add(w);
+  /// order. Composing rather than sorting by saved index means a button added
+  /// by a later version still appears instead of being silently dropped.
+  List<_BarAction> _ordered(List<_BarAction> items) {
+    final byId = {for (final a in items) a.id: a};
+    final out = <_BarAction>[];
+    for (final id in _savedList(kOptionMobileToolbarOrder)) {
+      final a = byId.remove(id);
+      if (a != null) out.add(a);
     }
-    for (final e in items) {
-      if (byId.containsKey(e.key)) ordered.add(byId.remove(e.key)!);
+    for (final a in items) {
+      if (byId.containsKey(a.id)) out.add(byId.remove(a.id)!);
     }
-    return ordered;
+    return out;
   }
 
-  String _barButtonLabel(String id) {
-    switch (id) {
-      case 'close':
-        return translate('Close');
-      case 'options':
-        return translate('Display Settings');
-      case 'keyboard':
-        return translate('Keyboard');
-      case 'actions':
-        return translate('Actions');
-      case 'gestures':
-        return translate('Mouse');
-      case 'chat':
-        return translate('Chat');
-      case 'more':
-        return translate('More');
-    }
-    return id;
+  List<Widget> _orderedBarButtons(FfiModel ffiModel) {
+    final more = _moreIds;
+    return _ordered(_barActions(ffiModel))
+        .where((a) => !more.contains(a.id))
+        .map((a) => IconButton(
+            color: MyTheme.accent, icon: a.icon, onPressed: a.onPressed))
+        .toList();
+  }
+
+  /// The actions the user pushed into the more-menu, in the same order the bar
+  /// would have shown them.
+  List<_BarAction> _moreActions() {
+    final ffiModel = Provider.of<FfiModel>(context, listen: false);
+    final more = _moreIds;
+    return _ordered(_barActions(ffiModel))
+        .where((a) => more.contains(a.id))
+        .toList();
   }
 
   void showRearrangeToolbar() {
     final ffiModel = Provider.of<FfiModel>(context, listen: false);
-    // Only what this session actually shows -- offering to arrange a button
-    // that is not on the bar would be arranging nothing.
-    final available = _barButtons(ffiModel).map((e) => e.key).toList();
-    final order = <String>[];
-    for (final id in _savedBarOrder) {
-      if (available.contains(id)) order.add(id);
-    }
-    for (final id in available) {
-      if (!order.contains(id)) order.add(id);
-    }
+    // Only what this session actually has -- arranging a button that is not
+    // present would be arranging nothing.
+    final actions = _ordered(_barActions(ffiModel));
+    final order = actions.map((a) => a.id).toList();
+    final labels = {for (final a in actions) a.id: a.label};
+    final inMore = _moreIds.where(order.contains).toSet();
 
-    gFFI.dialogManager.show((setStateDialog, close, context) => CustomAlertDialog(
-          title: Text(translate('Rearrange toolbar')),
-          content: SizedBox(
-            width: 320,
-            height: 340,
-            child: ReorderableListView(
-              buildDefaultDragHandles: true,
-              children: [
-                for (final id in order)
-                  ListTile(
-                    key: ValueKey(id),
-                    leading: Icon(Icons.drag_handle, color: MyTheme.accent),
-                    title: Text(_barButtonLabel(id)),
-                  )
+    gFFI.dialogManager.show(
+        (setStateDialog, close, context) => CustomAlertDialog(
+              title: Text(translate('Rearrange toolbar')),
+              content: SizedBox(
+                width: 320,
+                height: 360,
+                child: ReorderableListView(
+                  children: [
+                    for (final id in order)
+                      ListTile(
+                        key: ValueKey(id),
+                        leading:
+                            Icon(Icons.drag_handle, color: MyTheme.accent),
+                        title: Text(labels[id] ?? id),
+                        // On the bar, or tucked into the more-menu. Never
+                        // gone -- there is no state here that loses an action.
+                        trailing: IconButton(
+                          color: MyTheme.accent,
+                          icon: Icon(inMore.contains(id)
+                              ? Icons.more_horiz
+                              : Icons.check_box_outlined),
+                          tooltip: translate(
+                              inMore.contains(id) ? 'More' : 'Toolbar'),
+                          onPressed: () => setStateDialog(() {
+                            if (!inMore.remove(id)) inMore.add(id);
+                          }),
+                        ),
+                      )
+                  ],
+                  onReorder: (oldIndex, newIndex) {
+                    setStateDialog(() {
+                      // The insertion point is reported before the item is
+                      // removed, so anything moving down is off by one.
+                      if (newIndex > oldIndex) newIndex -= 1;
+                      order.insert(newIndex, order.removeAt(oldIndex));
+                    });
+                  },
+                ),
+              ),
+              actions: [
+                dialogButton(translate('Reset'), onPressed: () {
+                  bind.mainSetLocalOption(
+                      key: kOptionMobileToolbarOrder, value: '');
+                  bind.mainSetLocalOption(
+                      key: kOptionMobileToolbarMore, value: '');
+                  close();
+                  setState(() {});
+                }, isOutline: true),
+                dialogButton(translate('OK'), onPressed: () {
+                  bind.mainSetLocalOption(
+                      key: kOptionMobileToolbarOrder, value: order.join(','));
+                  bind.mainSetLocalOption(
+                      key: kOptionMobileToolbarMore,
+                      value: inMore.join(','));
+                  close();
+                  setState(() {});
+                }),
               ],
-              onReorder: (oldIndex, newIndex) {
-                setStateDialog(() {
-                  // ReorderableListView reports the insertion point before the
-                  // item is removed, so anything moving down is off by one.
-                  if (newIndex > oldIndex) newIndex -= 1;
-                  order.insert(newIndex, order.removeAt(oldIndex));
-                });
-              },
-            ),
-          ),
-          actions: [
-            dialogButton(translate('Reset'), onPressed: () {
-              bind.mainSetLocalOption(
-                  key: kOptionMobileToolbarOrder, value: '');
-              close();
-              setState(() {});
-            }, isOutline: true),
-            dialogButton(translate('OK'), onPressed: () {
-              bind.mainSetLocalOption(
-                  key: kOptionMobileToolbarOrder, value: order.join(','));
-              close();
-              setState(() {});
-            }),
-          ],
-        ));
+            ));
   }
 
   bool get showCursorPaint =>
@@ -992,7 +975,19 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     final mobileActionMenus = _getMobileActionMenus();
     final menus = toolbarControls(context, id, gFFI);
 
+    final demoted = _moreActions();
     final List<PopupMenuEntry<int>> more = [
+      ...demoted.asMap().entries.map((e) => PopupMenuItem<int>(
+            value: 1000 + e.key,
+            child: Row(children: [
+              IconTheme(
+                  data: IconThemeData(color: MyTheme.accent),
+                  child: e.value.icon),
+              SizedBox(width: 12),
+              Text(e.value.label),
+            ]),
+          )),
+      if (demoted.isNotEmpty) PopupMenuDivider(),
       ...mobileActionMenus
           .asMap()
           .entries
@@ -1016,6 +1011,10 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
         elevation: 8,
       );
       if (index != null) {
+        if (index >= 1000) {
+          demoted[index - 1000].onPressed();
+          return;
+        }
         if (index < mobileActionMenus.length) {
           mobileActionMenus[index].onPressed?.call();
         } else if (index < mobileActionMenus.length + more.length) {
@@ -1741,4 +1740,14 @@ class FABLocation extends FloatingActionButtonLocation {
     final offset = location.getOffset(scaffoldGeometry);
     return Offset(offset.dx + offsetX, offset.dy + offsetY);
   }
+}
+
+/// A toolbar action, in the only two forms the UI needs it: an icon for
+/// the bar, and an icon plus label for the more-menu.
+class _BarAction {
+  final String id;
+  final Widget icon;
+  final String label;
+  final VoidCallback onPressed;
+  _BarAction(this.id, this.icon, this.label, this.onPressed);
 }

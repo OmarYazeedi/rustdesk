@@ -163,6 +163,9 @@ const String kOptionUnifiedSort = "unified-sort";
 // Ids that are absent (a button added by a later version) fall in after these
 // in declaration order, so an old saved order never hides a new button.
 const String kOptionMobileToolbarOrder = "mobile-toolbar-order";
+// Comma-separated ids the user moved off the bar into the more-menu.
+// These are relocated, never hidden: every action stays reachable.
+const String kOptionMobileToolbarMore = "mobile-toolbar-more";
 const String kOptionUnifiedList = "unified-list";
 // The floating keyboard button: whether it's loose on the canvas or pinned away
 // into the toolbar, and where the user last left it. Position is stored as a
