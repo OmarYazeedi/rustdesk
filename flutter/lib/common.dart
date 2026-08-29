@@ -271,7 +271,9 @@ class MyTheme {
   // as separate planes rather than one flat field.
   static const Color bgDark = Color(0xFF1B1714);
   static const Color border = Color(0xFFCCCCCC);
-  static const Color idColor = Color(0xFF00B6F0);
+  // The ID is the one piece of identity on the connection screen, so it wears
+  // the brand colour rather than upstream cyan.
+  static const Color idColor = accent;
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;

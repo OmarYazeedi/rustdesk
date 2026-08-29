@@ -150,7 +150,21 @@ class HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Text(bind.mainGetAppNameSync());
+    // The mark had only ever appeared on the launcher and at the foot of
+    // Settings. In the app bar it sits on every screen, which is the point of
+    // having one.
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/logo.png',
+          height: 26,
+          filterQuality: FilterQuality.medium,
+        ),
+        const SizedBox(width: 10),
+        Text(bind.mainGetAppNameSync()),
+      ],
+    );
   }
 }
 

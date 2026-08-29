@@ -122,7 +122,10 @@ class _FileManagerPageState extends State<FileManagerPage> {
           centerTitle: true,
           title: ToggleSwitch(
             initialLabelIndex: showLocal ? 0 : 1,
-            activeBgColor: [MyTheme.idColor],
+            // Dark ground, accent lettering -- an amber fill this size reads
+            // as glare rather than emphasis.
+            activeBgColor: [MyTheme.barDark],
+            activeFgColor: MyTheme.accent,
             inactiveBgColor: Theme.of(context).brightness == Brightness.light
                 ? MyTheme.grayBg
                 : null,

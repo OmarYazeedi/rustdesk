@@ -67,6 +67,10 @@ for (const [d, m] of Object.entries(DENS)) {
 
 console.log('Windows:');
 write('res/icon.png', png(512, 0.90, AMBER));
+
+// Shown in the app's own chrome, not just the launcher.
+console.log('In-app:');
+write('flutter/assets/logo.png', png(256, 0.96, AMBER));
 const icoBuf = ico([16, 24, 32, 48, 64, 128, 256].map((s) => ({ size: s, png: png(s, 0.90, AMBER) })));
 write('res/icon.ico', icoBuf);
 write('flutter/assets/icon.ico', icoBuf);
