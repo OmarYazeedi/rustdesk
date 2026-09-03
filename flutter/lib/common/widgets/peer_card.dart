@@ -686,10 +686,24 @@ abstract class BasePeerCard extends StatelessWidget {
   MenuEntryBase<String> _createShortCutAction(String id) {
     return MenuEntryButton<String>(
       childBuilder: (TextStyle? style) => Text(
-        translate('Create desktop shortcut'),
+        translate(isAndroid ? 'Add to home screen' : 'Create desktop shortcut'),
         style: style,
       ),
-      proc: () {
+      proc: () async {
+        if (isAndroid) {
+          // The shortcut opens rustdesk://<id>, the same deep link the QR
+          // scanner uses, so a pinned device goes straight into a session --
+          // and into the running one if it is already connected.
+          final alias = await bind.mainGetPeerOption(id: id, key: 'alias');
+          final ok = await gFFI.invokeMethod('pin_device_shortcut', {
+            'id': id,
+            'label': alias.isNotEmpty ? alias : formatID(id),
+          });
+          // Launchers may refuse pinning outright; saying "Successful" then
+          // would be a lie the user only discovers at their home screen.
+          showToast(translate(ok == true ? 'Successful' : 'Failed'));
+          return;
+        }
         bind.mainCreateShortcut(id: id);
         showToast(translate('Successful'));
       },
@@ -989,7 +1003,7 @@ class RecentPeerCard extends BasePeerCard {
     if (isWindows && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_rdpAction(context, peer.id));
     }
-    if (isWindows) {
+    if (isWindows || isAndroid) {
       menuItems.add(_createShortCutAction(peer.id));
     }
     menuItems.add(MenuEntryDivider());
@@ -1052,7 +1066,7 @@ class FavoritePeerCard extends BasePeerCard {
     if (isWindows && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_rdpAction(context, peer.id));
     }
-    if (isWindows) {
+    if (isWindows || isAndroid) {
       menuItems.add(_createShortCutAction(peer.id));
     }
     menuItems.add(MenuEntryDivider());
@@ -1115,7 +1129,7 @@ class DiscoveredPeerCard extends BasePeerCard {
       menuItems.add(_rdpAction(context, peer.id));
     }
     menuItems.add(_wolAction(peer.id));
-    if (isWindows) {
+    if (isWindows || isAndroid) {
       menuItems.add(_createShortCutAction(peer.id));
     }
 
@@ -1171,7 +1185,7 @@ class AddressBookPeerCard extends BasePeerCard {
     if (isWindows && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_rdpAction(context, peer.id));
     }
-    if (isWindows) {
+    if (isWindows || isAndroid) {
       menuItems.add(_createShortCutAction(peer.id));
     }
     if (gFFI.abModel.current.canWrite()) {
@@ -1331,7 +1345,7 @@ class MyGroupPeerCard extends BasePeerCard {
     if (isWindows && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_rdpAction(context, peer.id));
     }
-    if (isWindows) {
+    if (isWindows || isAndroid) {
       menuItems.add(_createShortCutAction(peer.id));
     }
     // menuItems.add(MenuEntryDivider());

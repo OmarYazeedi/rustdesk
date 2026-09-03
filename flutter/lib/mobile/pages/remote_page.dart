@@ -102,6 +102,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    gActiveRemoteSessions.add(widget.id);
     gFFI
         .invokeMethod("get_value", "KEY_IS_SUPPORT_VOICE_CALL")
         .then((v) {
@@ -190,6 +191,9 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
 
   @override
   Future<void> dispose() async {
+    // Drop the registration first: this runs before the async teardown below,
+    // and a half-disposed page must not be something connect() pops back to.
+    gActiveRemoteSessions.remove(widget.id);
     WidgetsBinding.instance.removeObserver(this);
     // Close the session up-front. `gFFI.close()` below only calls `sessionClose`
     // after several awaits (canvas save, image update, the `enable_soft_keyboard`

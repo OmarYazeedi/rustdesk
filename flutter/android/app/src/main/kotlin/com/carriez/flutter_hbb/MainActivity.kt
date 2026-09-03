@@ -14,6 +14,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.ClipboardManager
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
+import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.os.IBinder
@@ -132,6 +136,40 @@ class MainActivity : FlutterActivity() {
         flutterMethodChannel.setMethodCallHandler { call, result ->
             // make sure result will be invoked, otherwise flutter will await forever
             when (call.method) {
+                // Pin a device to the launcher. The shortcut carries the same
+                // rustdesk://<id> deep link the QR scanner and browser use, so
+                // tapping it goes through one code path that already exists
+                // rather than a second way to start a session.
+                "pin_device_shortcut" -> {
+                    val id = call.argument<String>("id")
+                    val label = call.argument<String>("label") ?: id
+                    if (id.isNullOrEmpty()) {
+                        result.success(false)
+                    } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                        // requestPinShortcut is API 26+; minSdk here is 22.
+                        result.success(false)
+                    } else {
+                        val sm = getSystemService(ShortcutManager::class.java)
+                        if (sm == null || !sm.isRequestPinShortcutSupported) {
+                            // Some launchers simply refuse pinning. Reporting
+                            // false lets the UI say so instead of pretending.
+                            result.success(false)
+                        } else {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("rustdesk://" + id)
+                            ).setPackage(packageName)
+                            val info = ShortcutInfo.Builder(this, "peer-" + id)
+                                .setShortLabel(label!!)
+                                .setLongLabel(label)
+                                .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
+                                .setIntent(intent)
+                                .build()
+                            sm.requestPinShortcut(info, null)
+                            result.success(true)
+                        }
+                    }
+                }
                 // Download an update and hand it to the package installer.
                 // Returns immediately with "started"; the outcome arrives later
                 // through on_apk_install_result, because the download is not

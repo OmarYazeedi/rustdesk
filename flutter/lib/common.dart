@@ -2617,6 +2617,15 @@ connectMainDesktop(String id,
 /// If [isViewCamera], starts a session only for view camera.
 /// If [isTcpTunneling], starts a session only for tcp tunneling.
 /// If [isRDP], starts a session only for rdp.
+/// Peer ids with a live session page on the mobile navigator stack.
+///
+/// A pinned launcher shortcut fires the same rustdesk://<id> link whether or
+/// not that session is already open, so connect() has to tell the difference.
+/// Without it, tapping the shortcut mid-session pushes a second RemotePage for
+/// a peer already connected.
+final Set<String> gActiveRemoteSessions = <String>{};
+String remoteSessionRoute(String id) => '/remote/$id';
+
 connect(BuildContext context, String id,
     {bool isFileTransfer = false,
     bool isViewCamera = false,
@@ -2759,10 +2768,16 @@ connect(BuildContext context, String id,
             ),
           ),
         );
+      } else if (gActiveRemoteSessions.contains(id)) {
+        // Already connected: surface that session rather than starting a
+        // second one on top of it.
+        Navigator.popUntil(context, ModalRoute.withName(remoteSessionRoute(id)));
       } else {
         Navigator.push(
           context,
           MaterialPageRoute(
+            // Named so the branch above can pop back to it.
+            settings: RouteSettings(name: remoteSessionRoute(id)),
             builder: (BuildContext context) => RemotePage(
                 id: id,
                 password: password,
