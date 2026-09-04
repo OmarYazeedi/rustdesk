@@ -723,6 +723,14 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
             () => setState(() => _showGestureHelp = !_showGestureHelp)));
       }
     }
+    // Combos a touch device cannot otherwise produce: there is no Ctrl on an
+    // on-screen keyboard, and Ctrl+Alt+Del is intercepted by the OS anyway.
+    // Meaningless against an Android peer, so it is not offered there.
+    if (!(isWebDesktop || ffiModel.viewOnly || !ffiModel.keyboard) &&
+        !gFFI.ffiModel.isPeerAndroid) {
+      items.add(_BarAction('shortcuts', Icon(Icons.bolt),
+          translate('Key shortcuts'), showKeyShortcuts));
+    }
     if (!isWeb) {
       final voice = isAndroid && _isSupportVoiceCall;
       items.add(_BarAction(
@@ -784,6 +792,51 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     return _ordered(_barActions(ffiModel))
         .where((a) => more.contains(a.id))
         .toList();
+  }
+
+  void showKeyShortcuts() {
+    // Ctrl+Alt+Del is not a normal combo: on Windows it needs the secure
+    // attention sequence, which the backend already has a dedicated call for.
+    // Synthesising it from three key events would simply not work.
+    final entries = <List<dynamic>>[
+      ['Ctrl+Alt+Del', () => bind.sessionCtrlAltDel(sessionId: sessionId)],
+      ['Ctrl+Shift+Esc', () => sendKeyCombo('VK_ESCAPE', ctrl: true, shift: true)],
+      ['Ctrl+A', () => sendKeyCombo('VK_A', ctrl: true)],
+      ['Ctrl+C', () => sendKeyCombo('VK_C', ctrl: true)],
+      ['Ctrl+V', () => sendKeyCombo('VK_V', ctrl: true)],
+      ['Ctrl+X', () => sendKeyCombo('VK_X', ctrl: true)],
+      ['Ctrl+Z', () => sendKeyCombo('VK_Z', ctrl: true)],
+      ['Alt+Tab', () => sendKeyCombo('VK_TAB', alt: true)],
+      ['Alt+F4', () => sendKeyCombo('VK_F4', alt: true)],
+      ['Win', () => sendKeyCombo('Meta')],
+      ['Win+D', () => sendKeyCombo('VK_D', command: true)],
+      ['Win+E', () => sendKeyCombo('VK_E', command: true)],
+    ];
+    gFFI.dialogManager.show((setStateDialog, close, context) => CustomAlertDialog(
+          title: Text(translate('Key shortcuts')),
+          content: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: entries
+                .map((e) => OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MyTheme.accent,
+                        side: BorderSide(color: MyTheme.accent, width: 1),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                      ),
+                      // Sends and closes: these are one-shot actions, and the
+                      // panel covers the screen you are trying to affect.
+                      onPressed: () {
+                        (e[1] as Function)();
+                        close();
+                      },
+                      child: Text(e[0] as String),
+                    ))
+                .toList(),
+          ),
+          actions: [dialogButton(translate('Close'), onPressed: close)],
+        ));
   }
 
   void showRearrangeToolbar() {
@@ -1716,6 +1769,30 @@ TTextMenu? getResolutionMenu(FFI ffi, String id) {
       });
     },
   );
+}
+
+/// Send one key with exactly the given modifiers, then put the modifiers back.
+///
+/// inputKey() sends whatever modifier state the input model happens to be
+/// holding, so a combo has to set that state and restore it -- otherwise a
+/// sticky Ctrl from the keyboard bar would leak into the next keystroke, or a
+/// combo would silently pick up modifiers the user had left latched.
+void sendKeyCombo(String key,
+    {bool ctrl = false,
+    bool alt = false,
+    bool shift = false,
+    bool command = false}) {
+  final im = gFFI.inputModel;
+  final held = [im.ctrl, im.alt, im.shift, im.command];
+  im.ctrl = ctrl;
+  im.alt = alt;
+  im.shift = shift;
+  im.command = command;
+  im.inputKey(key);
+  im.ctrl = held[0];
+  im.alt = held[1];
+  im.shift = held[2];
+  im.command = held[3];
 }
 
 void sendPrompt(bool isMac, String key) {
