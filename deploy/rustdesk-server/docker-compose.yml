@@ -1,0 +1,38 @@
+# RustDesk ID + relay server, for /mnt/HDDs/Applications/rustdesk-server/
+#
+# host networking on purpose: hbbs does NAT hole punching and needs the real
+# source address of each client. Behind a bridge every client appears as the
+# docker gateway, punching fails, and every session silently falls back to the
+# relay -- working, but slow, and with no error to point at.
+#
+# named volumes on purpose: the Applications dataset's ACL blocks the chown
+# these containers do on first start, and a bind mount there crash-loops without
+# a useful message. Same trap that bit headscale-caddy.
+
+services:
+  hbbr:
+    container_name: hbbr
+    image: rustdesk/rustdesk-server:1.1.14
+    command: hbbr
+    network_mode: host
+    volumes:
+      - hbbr-data:/root
+    restart: unless-stopped
+
+  hbbs:
+    container_name: hbbs
+    # -r is the address clients are TOLD to use for the relay, so it must be the
+    # public hostname: a client outside the house receives this value verbatim
+    # and would otherwise be sent to a 192.168.x address.
+    command: hbbs -r vpn.omaryazeedi.com:21117
+    image: rustdesk/rustdesk-server:1.1.14
+    network_mode: host
+    volumes:
+      - hbbs-data:/root
+    depends_on:
+      - hbbr
+    restart: unless-stopped
+
+volumes:
+  hbbs-data:
+  hbbr-data:
