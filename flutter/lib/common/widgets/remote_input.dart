@@ -120,6 +120,7 @@ class _RawTouchGestureDetectorRegionState
       ? ffiModel.touchMode
       : ((isDesktop || isWebDesktop) || ffiModel.touchMode);
   SessionID get sessionId => ffi.sessionId;
+  bool get canvasLocked => isMobile && ffi.canvasModel.locked;
 
   @override
   Widget build(BuildContext context) {
@@ -478,6 +479,8 @@ class _RawTouchGestureDetectorRegionState
       await ffi.cursorModel.updatePan(delta * 2.0, d.focalPoint, handleTouch);
       return;
     }
+
+    if (canvasLocked) return;
 
     // Desktop forwards the pinch to the peer as a touch gesture. In tablet mode we
     // want what mobile does instead: zoom our own view of the remote screen.
