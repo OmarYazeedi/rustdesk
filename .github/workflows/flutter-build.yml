@@ -436,7 +436,9 @@ jobs:
         run: |
           git checkout -- res/msi
           cp -r ./rustdesk ./rustdesk-msi-template
-          mv ./rustdesk-msi-template/rustdesk.exe ./rustdesk-msi-template/RDAPPNAM.exe
+          # IHPortals.exe, per BINARY_NAME. Upstream's own comment says this step
+          # renames whatever the dist's <app-name>.exe is; ours is not rustdesk.exe.
+          mv ./rustdesk-msi-template/IHPortals.exe ./rustdesk-msi-template/RDAPPNAM.exe
           Set-Content -Path ./rustdesk-msi-template/custom.txt -Value 'placeholder' -NoNewline
           $assets = './rustdesk-msi-template/data/flutter_assets/assets'
           New-Item -ItemType Directory -Force -Path $assets | Out-Null
