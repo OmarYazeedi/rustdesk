@@ -2326,6 +2326,34 @@ pub fn load_custom_client() {
     // names containing it so translated strings don't get double-substituted.
     *config::APP_NAME.write().unwrap() = "IHPortals".to_owned();
 
+    // The self-hosted ID server on the NAS, reachable only over the tailnet.
+    // Set as PROD_RENDEZVOUS_SERVER rather than written into the config file:
+    // `get_rendezvous_server` consults the "custom-rendezvous-server" option
+    // first, so this is a compiled-in default that Settings can still override,
+    // and it costs no config I/O at a point in startup where the config path is
+    // not necessarily resolved yet.
+    //
+    // Its relay is advertised by hbbs itself (`-r 100.64.0.2:21117`), so there
+    // is nothing to configure client-side for that.
+    //
+    // Requires the device to be on the tailnet; there is no public fallback,
+    // because a custom rendezvous server is used instead of the public one, not
+    // alongside it.
+    *config::PROD_RENDEZVOUS_SERVER.write().unwrap() = "100.64.0.2".to_owned();
+
+    // The server's own public key. hbbs runs with `-k _` and refuses clients
+    // that cannot present it, which is what makes pointing at it safe.
+    //
+    // Seeded through DEFAULT_SETTINGS rather than the RS_PUB_KEY constant: that
+    // constant lives in the hbb_common submodule, which still tracks upstream,
+    // so an edit there would never reach CI. get_option resolves
+    // OVERWRITE_SETTINGS, then the stored config, then DEFAULT_SETTINGS -- so
+    // this behaves as a compiled-in default that Settings still overrides.
+    config::DEFAULT_SETTINGS
+        .write()
+        .unwrap()
+        .insert("key".to_owned(), "AFiaQUiURnBWfUbUU+jmMpusqLQTCJKf6GvIg9Yd4TU=".to_owned());
+
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
