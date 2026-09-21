@@ -71,6 +71,12 @@ write('res/icon.png', png(512, 0.90, AMBER));
 // Shown in the app's own chrome, not just the launcher.
 console.log('In-app:');
 write('flutter/assets/logo.png', png(256, 0.96, AMBER));
+
+// The native tray reads flutter_assets/assets/icon.png first (src/tray.rs,
+// load_icon_from_asset) and falls back to res/tray-icon.ico. We shipped
+// neither, so the tray kept showing upstream's RustDesk mark.
+write('flutter/assets/icon.png', png(256, 0.90, AMBER));
+write('res/tray-icon.ico', ico([16, 24, 32, 48, 64, 128, 256].map((s) => ({ size: s, png: png(s, 0.90, AMBER) }))));
 const icoBuf = ico([16, 24, 32, 48, 64, 128, 256].map((s) => ({ size: s, png: png(s, 0.90, AMBER) })));
 write('res/icon.ico', icoBuf);
 write('flutter/assets/icon.ico', icoBuf);
