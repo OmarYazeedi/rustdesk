@@ -246,9 +246,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
       trySyncClipboard();
       _restoreVideoForForeground();
       WakelockManager.enable(_uniqueKey);
+      _rebindSoftKeyboardForForeground();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _throttleVideoForBackground();
+      _closeSoftKeyboardForBackground();
       // Drop the screen wakelock while off-screen. It is held for the whole
       // session so the display doesn't time out mid-use, but backgrounded there
       // is nothing to keep lit -- and the display is the single largest draw on
@@ -282,6 +284,35 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
     bind.sessionSetCustomFpsTemporarily(
         sessionId: sessionId, fps: _preThrottleFps ?? kDefaultCustomFps);
     _preThrottleFps = null;
+  }
+
+  /// Android drops the IME while we are off-screen, but the hidden text field
+  /// would stay focused as its client. Close it the way the hide-keyboard
+  /// button does, so nothing stale is left attached to come back to.
+  void _closeSoftKeyboardForBackground() {
+    if (!isAndroid) return;
+    _timer?.cancel();
+    _showEdit = false;
+    _mobileFocusNode.unfocus();
+    _physicalFocusNode.requestFocus();
+    if (mounted) setState(() {});
+  }
+
+  /// Android binds the IME to a window when the window gains focus. At session
+  /// start that happens before FLAG_ALT_FOCUSABLE_IM is set, and the keyboard
+  /// works; on return the window regains focus with the flag already set, and
+  /// typing stays dead until reconnect. Recreate the session-start order:
+  /// `resumed` is only reported once the window has focus, so clear the flag
+  /// and set it again a beat later, after a traversal has applied it.
+  Future<void> _rebindSoftKeyboardForForeground() async {
+    if (!isAndroid || _showEdit) return;
+    await gFFI.invokeMethod("enable_soft_keyboard", true);
+    _timer?.cancel();
+    _timer = Timer(kMobileDelaySoftKeyboard, () {
+      if (!mounted || _showEdit) return;
+      _disableAndroidSoftKeyboard(
+          isKeyboardVisible: keyboardVisibilityController.isVisible);
+    });
   }
 
   // For client side
